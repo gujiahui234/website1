@@ -3,6 +3,14 @@ services:
     build:
       context: .
     ports:
-      - "8000:8000"
+      - "8800:8000"
+    volumes:
+      # 将宿主机的 /opt/dockers/alt_web01 挂载映射到容器内的 /app
+      - /opt/dockers/alt_web01:/app      
     restart: unless-stopped
+    networks:
+      - app-network
 
+networks:
+  app-network:
+    external: true
