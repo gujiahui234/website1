@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="alt_web01 大学生入学与毕业模拟系统">
+  <title>{% block title %}alt_web01{% endblock %}</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-sRIl4kxILFvY47J16cr9ZwB07vP4J8+LH7qKQnuqkuIAvNWLzeN8tE5YBujZqJLB" crossorigin="anonymous">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/site.css') }}">
+</head>
+<body>
+  <a class="skip-link" href="#main-content">跳到主要内容</a>
+  <nav class="navbar navbar-expand-lg campus-navbar" data-bs-theme="light" aria-label="主导航">
+    <div class="container-xl">
+      <a class="navbar-brand" href="{{ url_for('pages.home') }}" aria-label="alt_web01 首页">
+        <span class="brand-mark" aria-hidden="true"><span></span></span>
+        <span>alt_web01</span>
+      </a>
+      <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#mainNavbar" aria-controls="mainNavbar" aria-expanded="false" aria-label="展开导航">
+        <span class="navbar-toggler-icon"></span>
+      </button>
+      <div class="collapse navbar-collapse" id="mainNavbar">
+        <ul class="navbar-nav ms-auto align-items-lg-center">
+          <li class="nav-item">
+            <a class="nav-link{{ ' active' if request.endpoint == 'pages.home' }}" href="{{ url_for('pages.home') }}">首页</a>
+          </li>
+          <li class="nav-item dropdown">
+            <a class="nav-link dropdown-toggle{{ ' active' if request.endpoint in ['pages.student_add', 'pages.student_import_small', 'pages.student_import_large'] }}" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">学生</a>
+            <ul class="dropdown-menu dropdown-menu-end">
+              <li><a class="dropdown-item" href="{{ url_for('pages.student_add') }}">手工添加学生</a></li>
+              <li><a class="dropdown-item" href="{{ url_for('pages.student_import_small') }}">批量添加学生（小数据量）</a></li>
+              <li><a class="dropdown-item" href="{{ url_for('pages.student_import_large') }}">批量添加学生（大数据量）</a></li>
+            </ul>
+          </li>
+          <li class="nav-item dropdown">
+            <a class="nav-link dropdown-toggle{{ ' active' if request.endpoint in ['pages.university_add', 'pages.major_group_add', 'pages.university_generate'] }}" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">大学</a>
+            <ul class="dropdown-menu dropdown-menu-end">
+              <li><a class="dropdown-item" href="{{ url_for('pages.university_add') }}">手工添加大学</a></li>
+              <li><a class="dropdown-item" href="{{ url_for('pages.major_group_add') }}">手工添加专业组</a></li>
+              <li><a class="dropdown-item" href="{{ url_for('pages.university_generate') }}">自动添加大学和专业组</a></li>
+            </ul>
+          </li>
+          <li class="nav-item dropdown">
+            <a class="nav-link dropdown-toggle{{ ' active' if request.endpoint in ['pages.enrollment_manual', 'pages.enrollment_automatic'] }}" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">入学</a>
+            <ul class="dropdown-menu dropdown-menu-end">
+              <li><a class="dropdown-item" href="{{ url_for('pages.enrollment_manual') }}">手动入学</a></li>
+              <li><a class="dropdown-item" href="{{ url_for('pages.enrollment_automatic') }}">自动入学</a></li>
+            </ul>
+          </li>
+          <li class="nav-item dropdown">
+            <a class="nav-link dropdown-toggle{{ ' active' if request.endpoint in ['pages.analytics_students_by_year', 'pages.analytics_students_by_university'] }}" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">统计分析</a>
+            <ul class="dropdown-menu dropdown-menu-end">
+              <li><a class="dropdown-item" href="{{ url_for('pages.analytics_students_by_year') }}">历年学生数量统计</a></li>
+              <li><a class="dropdown-item" href="{{ url_for('pages.analytics_students_by_university') }}">各大学学生数量统计</a></li>
+            </ul>
+          </li>
+        </ul>
+      </div>
+    </div>
+  </nav>
+
+  <main id="main-content" class="page-shell">
+    {% block content %}{% endblock %}
+  </main>
+
+  <footer class="site-footer">
+    <div class="container-xl">alt_web01 · 让每一段校园旅程清晰可见</div>
+  </footer>
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/js/bootstrap.bundle.min.js" integrity="sha384-FKyoEForCGlyvwx9Hj09JcYn3nv7wiPVlz7YYwJrWVcXK/BmnVDxM+D2scQbITxI" crossorigin="anonymous"></script>
+</body>
+</html>
+

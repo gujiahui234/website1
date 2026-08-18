@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+
+{% block title %}{{ page_name }} · alt_web01{% endblock %}
+
+{% block content %}
+<section class="campus-stage" aria-labelledby="page-title">
+  <div class="campus-path" aria-hidden="true">
+    <span class="path-dot path-dot-start"></span>
+    <span class="path-dot path-dot-end"></span>
+  </div>
+  <div class="page-heading">
+    <p class="page-kicker">{{ page_kicker }}</p>
+    <h1 id="page-title">{{ page_name }}</h1>
+  </div>
+</section>
+{% endblock %}
+

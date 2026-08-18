@@ -1,0 +1,28 @@
+[build-system]
+requires = ["hatchling>=1.27"]
+build-backend = "hatchling.build"
+
+[project]
+name = "alt-web01"
+version = "0.1.0"
+description = "A demonstration framework for simulating university enrollment and graduation."
+readme = "README.md"
+requires-python = ">=3.13"
+license = { file = "LICENSE" }
+authors = [{ name = "alt_web01 contributors" }]
+classifiers = [
+    "Framework :: Flask",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.13",
+]
+dependencies = [
+    "Flask>=3.1,<4",
+    "gunicorn>=23,<24",
+]
+
+[project.urls]
+Repository = "https://github.com/ashida2016/website1"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/alt_web01"]
+
