@@ -6,9 +6,3 @@ services:
     ports:
       - "8800:8000"
     restart: unless-stopped
-    networks:
-      - app-network
-
-networks:
-  app-network:
-    external: true
