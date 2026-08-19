@@ -47,7 +47,7 @@ python app.py
 docker compose up --build
 ```
 
-打开 <http://127.0.0.1:8000>。停止服务时运行：
+打开 <http://127.0.0.1:8800>。停止服务时运行：
 
 ```powershell
 docker compose down
