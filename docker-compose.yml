@@ -2,6 +2,7 @@ services:
   web:
     build:
       context: .
+      network: host
     ports:
       - "8800:8000"
     restart: unless-stopped
