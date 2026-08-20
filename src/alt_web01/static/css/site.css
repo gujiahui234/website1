@@ -138,9 +138,7 @@ body {
 }
 
 .page-shell {
-  display: grid;
   flex: 1;
-  place-items: center;
   width: 100%;
   padding: 4rem 1.25rem;
 }
@@ -150,6 +148,7 @@ body {
   display: grid;
   place-items: center;
   width: min(100%, 72rem);
+  margin: 0 auto;
   min-height: 28rem;
   overflow: hidden;
   background: rgb(255 255 255 / 78%);
@@ -236,6 +235,189 @@ body {
   text-wrap: balance;
 }
 
+.student-workspace {
+  width: min(100%, 68rem);
+  margin: 0 auto;
+}
+
+.student-heading {
+  display: flex;
+  gap: 2rem;
+  align-items: end;
+  justify-content: space-between;
+  margin-bottom: 2rem;
+}
+
+.student-heading h1 {
+  margin: 0;
+  font-family: "STKaiti", "KaiTi", "Noto Serif SC", serif;
+  font-size: clamp(2.5rem, 6vw, 4.6rem);
+  font-weight: 700;
+  line-height: 1.06;
+  letter-spacing: -0.045em;
+}
+
+.student-intro {
+  max-width: 36rem;
+  margin: 1rem 0 0;
+  color: var(--campus-muted);
+  font-size: 1rem;
+}
+
+.range-note {
+  flex: 0 0 auto;
+  padding-left: 1rem;
+  border-left: 3px solid var(--campus-sun);
+}
+
+.range-note span,
+.range-note strong { display: block; }
+
+.range-note span {
+  color: var(--campus-muted);
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+}
+
+.range-note strong {
+  margin-top: 0.15rem;
+  font-family: "Segoe UI", system-ui, sans-serif;
+  font-size: 1.35rem;
+  letter-spacing: -0.03em;
+}
+
+.notice {
+  margin-bottom: 1rem;
+  padding: 0.9rem 1rem;
+  border-radius: 0.85rem;
+  font-weight: 650;
+}
+
+.notice-success { color: #0b5c4e; background: #dcf7ed; }
+.notice-error { color: #8c2e32; background: #ffeaeb; }
+.notice-mark { margin-right: 0.45rem; }
+
+.student-card,
+.saved-roster {
+  background: rgb(255 255 255 / 88%);
+  border: 1px solid rgb(23 59 79 / 9%);
+  box-shadow: 0 1.25rem 3.5rem rgb(40 105 117 / 9%);
+}
+
+.student-card {
+  position: relative;
+  padding: 2rem;
+  overflow: hidden;
+  border-radius: 1.6rem;
+}
+
+.student-card::after {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 7rem;
+  height: 0.32rem;
+  content: "";
+  background: linear-gradient(90deg, var(--campus-mint), var(--campus-sky));
+  border-radius: 0 1.6rem 0 1rem;
+}
+
+.student-form {
+  display: grid;
+  grid-template-columns: 1.35fr 1fr 0.72fr;
+  gap: 1.25rem;
+  align-items: end;
+}
+
+.form-field label {
+  display: block;
+  margin-bottom: 0.55rem;
+  font-size: 0.82rem;
+  font-weight: 750;
+}
+
+.form-field input,
+.form-field select {
+  width: 100%;
+  min-height: 3.2rem;
+  padding: 0.72rem 0.9rem;
+  color: var(--campus-ink);
+  background: #f8fcfb;
+  border: 1px solid #cfe0df;
+  border-radius: 0.78rem;
+  outline: none;
+}
+
+.form-field input:focus,
+.form-field select:focus {
+  border-color: #239f89;
+  box-shadow: 0 0 0 0.22rem rgb(68 199 161 / 18%);
+}
+
+.form-actions {
+  display: flex;
+  grid-column: 1 / -1;
+  gap: 0.75rem;
+  justify-content: flex-end;
+  padding-top: 0.5rem;
+}
+
+.button {
+  min-height: 2.9rem;
+  padding: 0.7rem 1.1rem;
+  border: 1px solid transparent;
+  border-radius: 0.78rem;
+  font-weight: 750;
+  transition: transform 150ms ease, box-shadow 150ms ease;
+}
+
+.button:hover { transform: translateY(-1px); }
+.button:focus-visible { outline: 3px solid rgb(107 184 242 / 45%); outline-offset: 2px; }
+.button-primary { color: #fff; background: #167f73; box-shadow: 0 0.55rem 1.2rem rgb(22 127 115 / 20%); }
+.button-secondary { color: #1d655f; background: #e8f8f3; border-color: #ccebe2; }
+
+.saved-roster {
+  margin-top: 1.5rem;
+  padding: 2rem;
+  border-radius: 1.6rem;
+}
+
+.roster-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 1.2rem;
+}
+
+.roster-heading .page-kicker { margin-bottom: 0.35rem; }
+.roster-heading h2 { margin: 0; font-size: 1.45rem; font-weight: 800; }
+.roster-count { padding: 0.35rem 0.75rem; color: #0c6d62; background: #e3f7f1; border-radius: 999px; font-size: 0.8rem; font-weight: 800; }
+
+.table-wrap { overflow-x: auto; }
+.saved-roster table { width: 100%; border-collapse: collapse; }
+.saved-roster th { padding: 0.7rem 0.8rem; color: var(--campus-muted); border-bottom: 1px solid #dce9e7; font-size: 0.75rem; letter-spacing: 0.06em; text-align: left; }
+.saved-roster td { padding: 0.95rem 0.8rem; border-bottom: 1px solid #edf3f2; }
+.saved-roster tbody tr:last-child td { border-bottom: 0; }
+.student-number { color: #128074; font-family: "Segoe UI", system-ui, sans-serif; font-size: 0.82rem; font-weight: 800; }
+.student-name { font-weight: 750; }
+
+.empty-roster {
+  display: flex;
+  gap: 0.85rem;
+  align-items: center;
+  padding: 1.25rem;
+  color: var(--campus-muted);
+  background: #f5faf9;
+  border: 1px dashed #bfd8d4;
+  border-radius: 1rem;
+}
+
+.empty-roster span { display: grid; flex: 0 0 auto; place-items: center; width: 2rem; height: 2rem; color: #178777; background: #dcf5ee; border-radius: 50%; font-size: 1.2rem; }
+.empty-roster p,
+.storage-note { margin: 0; }
+.storage-note { margin-top: 1rem; color: var(--campus-muted); font-size: 0.78rem; }
+
 .site-footer {
   padding: 1.4rem 1rem;
   color: var(--campus-muted);
@@ -255,6 +437,18 @@ body {
   .page-shell { padding: 1.5rem 0.8rem; }
   .campus-stage { min-height: 25rem; border-radius: 1.4rem; }
   .page-heading { padding: 2rem 1.25rem; }
+  .student-heading { display: block; }
+  .range-note { margin-top: 1.5rem; }
+  .student-card,
+  .saved-roster { padding: 1.25rem; border-radius: 1.2rem; }
+  .student-form { grid-template-columns: 1fr; }
+  .form-actions { flex-direction: column-reverse; }
+  .button { width: 100%; }
+}
+
+@media (min-width: 576px) and (max-width: 860px) {
+  .student-form { grid-template-columns: 1fr 1fr; }
+  .form-field-name { grid-column: 1 / -1; }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -265,4 +459,3 @@ body {
     transition: none !important;
   }
 }
-

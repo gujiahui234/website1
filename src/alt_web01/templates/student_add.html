@@ -1,0 +1,92 @@
+{% extends "base.html" %}
+
+{% block title %}手工添加学生 · alt_web01{% endblock %}
+
+{% block content %}
+<section class="student-workspace" aria-labelledby="page-title">
+  <header class="student-heading">
+    <div>
+      <p class="page-kicker">学生 · 档案录入</p>
+      <h1 id="page-title">手工添加学生</h1>
+      <p class="student-intro">填写一份学生档案，或先生成一组虚构信息再确认保存。</p>
+    </div>
+    <div class="range-note" aria-label="允许的生日范围">
+      <span>生日范围</span>
+      <strong>2000 — 2020</strong>
+    </div>
+  </header>
+
+  {% if saved %}
+    <div class="notice notice-success" role="status">
+      <span class="notice-mark" aria-hidden="true">✓</span>
+      学生保存成功，已加入下方清单。
+    </div>
+  {% endif %}
+  {% if error %}
+    <div class="notice notice-error" role="alert">{{ error }}</div>
+  {% endif %}
+
+  <div class="student-card">
+    <form method="post" class="student-form">
+      <div class="form-field form-field-name">
+        <label for="name">姓名</label>
+        <input id="name" name="name" type="text" value="{{ values.name }}" maxlength="40" autocomplete="name" placeholder="例如：林知夏" required>
+      </div>
+      <div class="form-field">
+        <label for="birthday">生日</label>
+        <input id="birthday" name="birthday" type="date" value="{{ values.birthday }}" min="{{ birthday_min }}" max="{{ birthday_max }}" required>
+      </div>
+      <div class="form-field">
+        <label for="gender">性别</label>
+        <select id="gender" name="gender" required>
+          <option value=""{{ ' selected' if not values.gender }}>请选择</option>
+          <option value="男"{{ ' selected' if values.gender == '男' }}>男</option>
+          <option value="女"{{ ' selected' if values.gender == '女' }}>女</option>
+        </select>
+      </div>
+      <div class="form-actions">
+        <button class="button button-secondary" type="submit" name="action" value="generate" formnovalidate>
+          <span aria-hidden="true">↻</span> 自动生成
+        </button>
+        <button class="button button-primary" type="submit" name="action" value="save">保存学生</button>
+      </div>
+    </form>
+  </div>
+
+  <section class="saved-roster" aria-labelledby="roster-title">
+    <div class="roster-heading">
+      <div>
+        <p class="page-kicker">本次运行</p>
+        <h2 id="roster-title">已保存学生清单</h2>
+      </div>
+      <span class="roster-count">{{ students|length }} 人</span>
+    </div>
+
+    {% if students %}
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr><th scope="col">序号</th><th scope="col">姓名</th><th scope="col">生日</th><th scope="col">性别</th></tr>
+          </thead>
+          <tbody>
+            {% for student in students %}
+              <tr>
+                <td><span class="student-number">{{ "%02d"|format(student.number) }}</span></td>
+                <td class="student-name">{{ student.name }}</td>
+                <td>{{ student.birthday.isoformat() }}</td>
+                <td>{{ student.gender }}</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% else %}
+      <div class="empty-roster">
+        <span aria-hidden="true">＋</span>
+        <p>清单还是空的。填写上方档案并保存，第一位学生会出现在这里。</p>
+      </div>
+    {% endif %}
+    <p class="storage-note">数据仅保存在当前应用进程中，重启后会清空，暂不写入数据库。</p>
+  </section>
+</section>
+{% endblock %}

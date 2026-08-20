@@ -18,11 +18,15 @@ classifiers = [
 dependencies = [
     "Flask>=3.1,<4",
     "gunicorn>=23,<24",
+    "class-roster-simulator @ git+https://github.com/gujiahui234/class_roster_simulator-0.1.0.git@ver0.2.0",
+    "sclog_lite @ git+https://github.com/gujiahui234/sclog_lite.git@ver0.3.0"
 ]
 
+[tool.hatch.metadata]
+allow-direct-references = true
+
 [project.urls]
-Repository = "https://github.com/ashida2016/website1"
+Repository = "https://github.com/gujiahui234/website1"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/alt_web01"]
-
