@@ -2,13 +2,7 @@ services:
   web:
     build:
       context: .
-      # network: host
+      network: host
     ports:
       - "8800:8000"
     restart: unless-stopped
-    networks:
-      - app-network
-
-networks:
-  app-network:
-    external: true
