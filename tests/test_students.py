@@ -4,8 +4,10 @@ from __future__ import annotations
 
 import re
 import unittest
+from unittest.mock import patch
 
 from alt_web01 import create_app
+from alt_web01.student_store import MySQLSettings, MySQLStudentStore
 
 
 class StudentWorkflowTests(unittest.TestCase):
@@ -69,6 +71,41 @@ class StudentWorkflowTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertIn("生日必须在 2000 年至 2020 年之间", page)
         self.assertNotIn("<td class=\"student-name\">越界学生</td>", page)
+
+
+class MySQLStudentStoreTests(unittest.TestCase):
+    """Check the MySQL safety boundary without requiring a live database."""
+
+    def test_rejects_root_database_account(self) -> None:
+        """The application must never connect to MySQL as root."""
+        with self.assertRaisesRegex(RuntimeError, "non-root"):
+            MySQLSettings.from_config(
+                {
+                    "MYSQL_HOST": "mysql-server",
+                    "MYSQL_DATABASE": "test_db",
+                    "MYSQL_USER": "root",
+                    "MYSQL_PASSWORD": "not-used",
+                }
+            )
+
+    @patch("alt_web01.student_store.pymysql.connect")
+    def test_connection_uses_configured_non_root_account(self, connect: object) -> None:
+        """The store should pass only the configured app account to PyMySQL."""
+        settings = MySQLSettings(
+            host="mysql-server",
+            port=3306,
+            database="test_db",
+            user="test_user",
+            password="database-password",
+        )
+        store = MySQLStudentStore(settings)
+
+        store._connect()
+
+        connect.assert_called_once()  # type: ignore[attr-defined]
+        call_kwargs = connect.call_args.kwargs  # type: ignore[attr-defined]
+        self.assertEqual(call_kwargs["user"], "test_user")
+        self.assertNotEqual(call_kwargs["user"], "root")
 
 
 if __name__ == "__main__":

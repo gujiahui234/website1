@@ -56,7 +56,7 @@
   <section class="saved-roster" aria-labelledby="roster-title">
     <div class="roster-heading">
       <div>
-        <p class="page-kicker">本次运行</p>
+        <p class="page-kicker">{{ "数据库记录" if persistent else "本次运行" }}</p>
         <h2 id="roster-title">已保存学生清单</h2>
       </div>
       <span class="roster-count">{{ students|length }} 人</span>
@@ -86,7 +86,11 @@
         <p>清单还是空的。填写上方档案并保存，第一位学生会出现在这里。</p>
       </div>
     {% endif %}
-    <p class="storage-note">数据仅保存在当前应用进程中，重启后会清空，暂不写入数据库。</p>
+    {% if persistent %}
+      <p class="storage-note">数据已写入独立 MySQL 容器，应用重启后仍会保留。</p>
+    {% else %}
+      <p class="storage-note">当前为本地内存模式，重启后会清空。</p>
+    {% endif %}
   </section>
 </section>
 {% endblock %}

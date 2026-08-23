@@ -3,12 +3,20 @@
 from __future__ import annotations
 
 import atexit
+import os
 from pathlib import Path
 from time import perf_counter
 
 from flask import Flask, Response, g, request
 from sclog_lite import logger, setup_logger, shutdown
 from werkzeug.exceptions import HTTPException
+
+from alt_web01.student_store import (
+    MemoryStudentStore,
+    MySQLSettings,
+    MySQLStudentStore,
+    StudentStore,
+)
 
 _logging_configured = False
 
@@ -61,7 +69,7 @@ def _register_logging_middleware(app: Flask) -> None:
         return "服务器内部错误", 500
 
 
-def create_app() -> Flask:
+def create_app(test_config: dict[str, object] | None = None) -> Flask:
     """Create and configure the Flask application.
 
     Returns:
@@ -69,11 +77,33 @@ def create_app() -> Flask:
     """
     _configure_logging()
     app = Flask(__name__)
-    app.extensions["saved_students"] = []
+    app.config.from_mapping(
+        STUDENT_STORE=os.getenv("STUDENT_STORE", "memory"),
+        MYSQL_HOST=os.getenv("MYSQL_HOST", ""),
+        MYSQL_PORT=os.getenv("MYSQL_PORT", "3306"),
+        MYSQL_DATABASE=os.getenv("MYSQL_DATABASE", ""),
+        MYSQL_USER=os.getenv("MYSQL_USER", ""),
+        MYSQL_PASSWORD=os.getenv("MYSQL_PASSWORD", ""),
+    )
+    if test_config is not None:
+        app.config.update(test_config)
+
+    store_mode = str(app.config["STUDENT_STORE"]).strip().casefold()
+    store: StudentStore
+    if store_mode == "mysql":
+        store = MySQLStudentStore(MySQLSettings.from_config(app.config))
+        store.ensure_schema()
+    elif store_mode == "memory":
+        store = MemoryStudentStore()
+    else:
+        raise RuntimeError("STUDENT_STORE must be either 'memory' or 'mysql'")
+    app.extensions["student_store"] = store
 
     from alt_web01.views import pages
 
     app.register_blueprint(pages)
     _register_logging_middleware(app)
-    logger.bind(component="flask").info("alt_web01 应用已创建")
+    logger.bind(component="flask", student_store=store_mode).info(
+        "alt_web01 应用已创建"
+    )
     return app

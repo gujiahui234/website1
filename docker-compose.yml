@@ -5,4 +5,18 @@ services:
       network: host
     ports:
       - "8800:8000"
+    environment:
+      STUDENT_STORE: mysql
+      MYSQL_HOST: mysql-server
+      MYSQL_PORT: "3306"
+      MYSQL_DATABASE: "${MYSQL_DATABASE:-test_db}"
+      MYSQL_USER: "${MYSQL_USER:-test_user}"
+      MYSQL_PASSWORD: "${MYSQL_PASSWORD:?MYSQL_PASSWORD must be set in .env}"
+    networks:
+      - default
+      - app-network
     restart: unless-stopped
+
+networks:
+  app-network:
+    external: true

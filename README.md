@@ -15,7 +15,7 @@
 
 - 可录入姓名、生日和性别；生日范围为 `2000-01-01` 至 `2020-12-31`
 - “自动生成”通过 `class-roster-simulator` 生成一名虚构学生并回填表单
-- “保存学生”暂存到当前应用进程，在页面下方展示，不写入数据库
+- Docker 部署时，“保存学生”写入 `/opt/dockers/mysql` 中独立运行的 MySQL；本地未配置时仍可使用内存模式
 - Flask 请求、异常与保存成功事件通过 `sclog_lite` 输出到控制台和 `logs/`
 
 ## 项目结构
@@ -61,3 +61,14 @@ docker compose up --build
 ```powershell
 docker compose down
 ```
+
+部署前在项目目录创建 `.env`（不要提交），填写独立 MySQL 已有的普通应用账户：
+
+```dotenv
+MYSQL_DATABASE=test_db
+MYSQL_USER=test_user
+MYSQL_PASSWORD=使用 /opt/dockers/mysql/.env 中现有的 MYSQL_PASSWORD
+```
+
+网站容器会加入 MySQL 使用的外部 `app-network`，通过容器名 `mysql-server:3306`
+连接。应用会拒绝 `MYSQL_USER=root`，并自动创建 `students` 表。

@@ -5,7 +5,7 @@ from __future__ import annotations
 import datetime as dt
 from typing import cast
 
-from class_roster import Student, simulate_class
+from class_roster import simulate_class
 from flask import (
     Blueprint,
     current_app,
@@ -16,6 +16,8 @@ from flask import (
 )
 from flask.typing import ResponseReturnValue
 from sclog_lite import logger
+
+from alt_web01.student_store import StudentStore
 
 pages = Blueprint("pages", __name__)
 
@@ -45,9 +47,9 @@ def home() -> str:
     return render_page("首页", "ALT · CAMPUS")
 
 
-def _saved_students() -> list[Student]:
-    """Return the current process-local student store."""
-    return cast(list[Student], current_app.extensions["saved_students"])
+def _student_store() -> StudentStore:
+    """Return the configured student persistence backend."""
+    return cast(StudentStore, current_app.extensions["student_store"])
 
 
 def _student_form_values() -> dict[str, str]:
@@ -80,13 +82,14 @@ def _render_student_form(
     values: dict[str, str] | None = None,
     error: str | None = None,
 ) -> str:
-    """Render the student form and the process-local saved roster."""
+    """Render the student form and the saved roster."""
     return render_template(
         "student_add.html",
         values=values or {"name": "", "birthday": "", "gender": ""},
         error=error,
         saved=request.args.get("saved") == "1",
-        students=_saved_students(),
+        students=_student_store().list_students(),
+        persistent=current_app.config["STUDENT_STORE"] == "mysql",
         birthday_min=BIRTHDAY_MIN.isoformat(),
         birthday_max=BIRTHDAY_MAX.isoformat(),
     )
@@ -94,7 +97,7 @@ def _render_student_form(
 
 @pages.route("/students/add", methods=["GET", "POST"])
 def student_add() -> ResponseReturnValue:
-    """Generate, validate, and save fictional students in memory."""
+    """Generate, validate, and save fictional students."""
     if request.method == "GET":
         return _render_student_form()
 
@@ -121,14 +124,11 @@ def student_add() -> ResponseReturnValue:
         )
         return _render_student_form(values, error)
 
-    students = _saved_students()
-    student = Student(
-        number=len(students) + 1,
+    student = _student_store().save_student(
         name=values["name"],
         gender=values["gender"],
         birthday=birthday,
     )
-    students.append(student)
     logger.bind(
         component="students",
         student_number=student.number,
