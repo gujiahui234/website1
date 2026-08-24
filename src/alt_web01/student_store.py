@@ -7,20 +7,30 @@ from dataclasses import dataclass, field
 from typing import Mapping, Protocol, cast
 
 import pymysql  # type: ignore[import-untyped]
-from class_roster import Student
 from pymysql.connections import Connection  # type: ignore[import-untyped]
 from pymysql.cursors import DictCursor  # type: ignore[import-untyped]
+
+
+@dataclass(frozen=True)
+class SavedStudent:
+    """A student record together with its database save time."""
+
+    number: int
+    name: str
+    gender: str
+    birthday: dt.date
+    saved_at: dt.datetime
 
 
 class StudentStore(Protocol):
     """Persistence contract used by the student views."""
 
-    def list_students(self) -> list[Student]:
-        """Return all saved students in creation order."""
+    def list_students(self) -> list[SavedStudent]:
+        """Return at most the 1,000 most recently saved students."""
 
     def save_student(
         self, *, name: str, gender: str, birthday: dt.date
-    ) -> Student:
+    ) -> SavedStudent:
         """Persist and return one student."""
 
 
@@ -28,22 +38,29 @@ class StudentStore(Protocol):
 class MemoryStudentStore:
     """Process-local fallback used by local development and unit tests."""
 
-    students: list[Student] = field(default_factory=list)
+    students: list[SavedStudent] = field(default_factory=list)
+    next_number: int = 1
 
-    def list_students(self) -> list[Student]:
-        """Return a snapshot of the process-local roster."""
-        return list(self.students)
+    def list_students(self) -> list[SavedStudent]:
+        """Return the newest 1,000 process-local records."""
+        return sorted(
+            self.students,
+            key=lambda student: (student.saved_at, student.number),
+            reverse=True,
+        )[:1000]
 
     def save_student(
         self, *, name: str, gender: str, birthday: dt.date
-    ) -> Student:
+    ) -> SavedStudent:
         """Append one student to process-local memory."""
-        student = Student(
-            number=len(self.students) + 1,
+        student = SavedStudent(
+            number=self.next_number,
             name=name,
             gender=gender,
             birthday=birthday,
+            saved_at=dt.datetime.now(),
         )
+        self.next_number += 1
         self.students.append(student)
         return student
 
@@ -131,31 +148,35 @@ class MySQLStudentStore:
         finally:
             connection.close()
 
-    def list_students(self) -> list[Student]:
-        """Load all students from MySQL in creation order."""
+    def list_students(self) -> list[SavedStudent]:
+        """Load the 1,000 most recently saved students from MySQL."""
         connection = self._connect()
         try:
             with connection.cursor() as cursor:
                 cursor.execute(
-                    "SELECT id, name, birthday, gender FROM students ORDER BY id"
+                    "SELECT id, name, birthday, gender, created_at "
+                    "FROM students "
+                    "ORDER BY created_at DESC, id DESC "
+                    "LIMIT 1000"
                 )
                 rows = cast(list[dict[str, object]], cursor.fetchall())
         finally:
             connection.close()
 
         return [
-            Student(
+            SavedStudent(
                 number=cast(int, row["id"]),
                 name=str(row["name"]),
                 birthday=cast(dt.date, row["birthday"]),
                 gender=str(row["gender"]),
+                saved_at=cast(dt.datetime, row["created_at"]),
             )
             for row in rows
         ]
 
     def save_student(
         self, *, name: str, gender: str, birthday: dt.date
-    ) -> Student:
+    ) -> SavedStudent:
         """Insert one student in a transaction and return its database id."""
         connection = self._connect()
         try:
@@ -175,9 +196,10 @@ class MySQLStudentStore:
 
         if student_id is None:
             raise RuntimeError("MySQL did not return a student id")
-        return Student(
+        return SavedStudent(
             number=int(student_id),
             name=name,
             gender=gender,
             birthday=birthday,
+            saved_at=dt.datetime.now(),
         )

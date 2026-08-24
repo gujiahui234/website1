@@ -392,15 +392,49 @@ body {
 
 .roster-heading .page-kicker { margin-bottom: 0.35rem; }
 .roster-heading h2 { margin: 0; font-size: 1.45rem; font-weight: 800; }
+.roster-caption { margin: 0.4rem 0 0; color: var(--campus-muted); font-size: 0.78rem; }
 .roster-count { padding: 0.35rem 0.75rem; color: #0c6d62; background: #e3f7f1; border-radius: 999px; font-size: 0.8rem; font-weight: 800; }
 
-.table-wrap { overflow-x: auto; }
+.table-wrap { min-width: 0; }
+.table-wrap .dt-layout-table { overflow-x: auto; }
 .saved-roster table { width: 100%; border-collapse: collapse; }
 .saved-roster th { padding: 0.7rem 0.8rem; color: var(--campus-muted); border-bottom: 1px solid #dce9e7; font-size: 0.75rem; letter-spacing: 0.06em; text-align: left; }
 .saved-roster td { padding: 0.95rem 0.8rem; border-bottom: 1px solid #edf3f2; }
 .saved-roster tbody tr:last-child td { border-bottom: 0; }
 .student-number { color: #128074; font-family: "Segoe UI", system-ui, sans-serif; font-size: 0.82rem; font-weight: 800; }
 .student-name { font-weight: 750; }
+.age-value { color: #0f776d; font-family: "Segoe UI", system-ui, sans-serif; font-weight: 800; }
+
+.saved-roster .dt-container { color: var(--campus-ink); font-size: 0.88rem; }
+.saved-roster table.dataTable thead > tr > th .dt-column-header {
+  flex-direction: row !important;
+  gap: 0.4rem;
+  justify-content: flex-start !important;
+}
+.saved-roster .dt-layout-row { gap: 1rem; margin: 0.85rem 0; align-items: center; }
+.saved-roster .dt-layout-row:first-child { margin-top: 0; }
+.saved-roster .dt-input {
+  min-height: 2.55rem;
+  padding: 0.45rem 0.7rem;
+  color: var(--campus-ink);
+  background: #f8fcfb;
+  border: 1px solid #cfe0df;
+  border-radius: 0.68rem;
+}
+.saved-roster .dt-input:focus {
+  border-color: #239f89;
+  box-shadow: 0 0 0 0.2rem rgb(68 199 161 / 16%);
+  outline: none;
+}
+.saved-roster .dt-paging-button {
+  min-width: 2.25rem;
+  border-radius: 0.6rem !important;
+}
+.saved-roster .dt-paging-button.current {
+  color: #fff !important;
+  background: #167f73 !important;
+  border-color: #167f73 !important;
+}
 
 .empty-roster {
   display: flex;

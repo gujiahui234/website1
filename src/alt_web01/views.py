@@ -26,6 +26,31 @@ BIRTHDAY_MAX = dt.date(2020, 12, 31)
 VALID_GENDERS = {"男", "女"}
 
 
+def _birthday_in_year(birthday: dt.date, year: int) -> dt.date:
+    """Return the birthday anniversary in a year, mapping Feb 29 to Feb 28."""
+    try:
+        return birthday.replace(year=year)
+    except ValueError:
+        return dt.date(year, 2, 28)
+
+
+def _age_on(birthday: dt.date, as_of: dt.date) -> float:
+    """Calculate fractional age between adjacent birthday anniversaries."""
+    anniversary = _birthday_in_year(birthday, as_of.year)
+    if as_of >= anniversary:
+        completed_years = as_of.year - birthday.year
+        previous_birthday = anniversary
+        next_birthday = _birthday_in_year(birthday, as_of.year + 1)
+    else:
+        completed_years = as_of.year - birthday.year - 1
+        previous_birthday = _birthday_in_year(birthday, as_of.year - 1)
+        next_birthday = anniversary
+
+    elapsed_days = (as_of - previous_birthday).days
+    year_days = (next_birthday - previous_birthday).days
+    return round(completed_years + elapsed_days / year_days, 1)
+
+
 def render_page(page_name: str, page_kicker: str) -> str:
     """Render a named placeholder page.
 
@@ -83,12 +108,18 @@ def _render_student_form(
     error: str | None = None,
 ) -> str:
     """Render the student form and the saved roster."""
+    students = _student_store().list_students()
+    today = dt.date.today()
     return render_template(
         "student_add.html",
         values=values or {"name": "", "birthday": "", "gender": ""},
         error=error,
         saved=request.args.get("saved") == "1",
-        students=_student_store().list_students(),
+        students=students,
+        student_rows=[
+            (student, _age_on(student.birthday, today)) for student in students
+        ],
+        age_as_of=today.isoformat(),
         persistent=current_app.config["STUDENT_STORE"] == "mysql",
         birthday_min=BIRTHDAY_MIN.isoformat(),
         birthday_max=BIRTHDAY_MAX.isoformat(),

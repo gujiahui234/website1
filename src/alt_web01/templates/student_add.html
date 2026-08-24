@@ -2,6 +2,10 @@
 
 {% block title %}手工添加学生 · alt_web01{% endblock %}
 
+{% block vendor_styles %}
+  <link rel="stylesheet" href="https://cdn.datatables.net/3.0.2/css/dataTables.dataTables.css">
+{% endblock %}
+
 {% block content %}
 <section class="student-workspace" aria-labelledby="page-title">
   <header class="student-heading">
@@ -58,34 +62,37 @@
       <div>
         <p class="page-kicker">{{ "数据库记录" if persistent else "本次运行" }}</p>
         <h2 id="roster-title">已保存学生清单</h2>
+        <p class="roster-caption">最近保存的 1,000 条 · 年龄计算日期 {{ age_as_of }}</p>
       </div>
       <span class="roster-count">{{ students|length }} 人</span>
     </div>
 
-    {% if students %}
-      <div class="table-wrap">
-        <table>
+    <div class="table-wrap">
+        <table id="students-table" class="display student-data-table">
           <thead>
-            <tr><th scope="col">序号</th><th scope="col">姓名</th><th scope="col">生日</th><th scope="col">性别</th></tr>
+            <tr>
+              <th scope="col">序号</th>
+              <th scope="col">姓名</th>
+              <th scope="col">生日</th>
+              <th scope="col">年龄</th>
+              <th scope="col">性别</th>
+              <th scope="col">保存时间</th>
+            </tr>
           </thead>
           <tbody>
-            {% for student in students %}
+            {% for student, age in student_rows %}
               <tr>
                 <td><span class="student-number">{{ "%02d"|format(student.number) }}</span></td>
                 <td class="student-name">{{ student.name }}</td>
                 <td>{{ student.birthday.isoformat() }}</td>
+                <td data-order="{{ age }}"><span class="age-value">{{ "%.1f"|format(age) }}</span> 岁</td>
                 <td>{{ student.gender }}</td>
+                <td data-order="{{ student.saved_at.isoformat() }}">{{ student.saved_at.strftime("%Y-%m-%d %H:%M:%S") }}</td>
               </tr>
             {% endfor %}
           </tbody>
         </table>
-      </div>
-    {% else %}
-      <div class="empty-roster">
-        <span aria-hidden="true">＋</span>
-        <p>清单还是空的。填写上方档案并保存，第一位学生会出现在这里。</p>
-      </div>
-    {% endif %}
+    </div>
     {% if persistent %}
       <p class="storage-note">数据已写入独立 MySQL 容器，应用重启后仍会保留。</p>
     {% else %}
@@ -93,4 +100,24 @@
     {% endif %}
   </section>
 </section>
+{% endblock %}
+
+{% block scripts %}
+  <script src="https://cdn.datatables.net/3.0.2/js/dataTables.js"></script>
+  <script>
+    new DataTable("#students-table", {
+      order: [[5, "desc"], [0, "desc"]],
+      pageLength: 25,
+      lengthMenu: [10, 25, 50, 100],
+      language: {
+        search: "搜索：",
+        lengthMenu: "每页显示 _MENU_ 条",
+        info: "显示第 _START_ 至 _END_ 条，共 _TOTAL_ 条",
+        infoEmpty: "暂无学生记录",
+        zeroRecords: "没有符合条件的学生",
+        emptyTable: "数据库中暂无学生数据",
+        paginate: { first: "首页", previous: "上一页", next: "下一页", last: "末页" }
+      }
+    });
+  </script>
 {% endblock %}

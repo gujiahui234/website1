@@ -3,11 +3,13 @@
 from __future__ import annotations
 
 import re
+import datetime as dt
 import unittest
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 from alt_web01 import create_app
 from alt_web01.student_store import MySQLSettings, MySQLStudentStore
+from alt_web01.views import _age_on
 
 
 class StudentWorkflowTests(unittest.TestCase):
@@ -15,8 +17,7 @@ class StudentWorkflowTests(unittest.TestCase):
 
     def setUp(self) -> None:
         """Create an isolated application store for each test."""
-        self.app = create_app()
-        self.app.config.update(TESTING=True)
+        self.app = create_app({"STUDENT_STORE": "memory", "TESTING": True})
         self.client = self.app.test_client()
 
     def test_generate_returns_fictional_student_in_allowed_range(self) -> None:
@@ -54,6 +55,10 @@ class StudentWorkflowTests(unittest.TestCase):
         self.assertIn("学生保存成功", page)
         self.assertIn("测试学生", page)
         self.assertIn("2010-06-15", page)
+        self.assertIn("id=\"students-table\"", page)
+        self.assertIn("年龄", page)
+        self.assertIn("保存时间", page)
+        self.assertIn("new DataTable", page)
 
     def test_rejects_birthday_outside_allowed_range(self) -> None:
         """Server-side validation should reject dates outside the HTML limits."""
@@ -89,7 +94,9 @@ class MySQLStudentStoreTests(unittest.TestCase):
             )
 
     @patch("alt_web01.student_store.pymysql.connect")
-    def test_connection_uses_configured_non_root_account(self, connect: object) -> None:
+    def test_connection_uses_configured_non_root_account(
+        self, connect: MagicMock
+    ) -> None:
         """The store should pass only the configured app account to PyMySQL."""
         settings = MySQLSettings(
             host="mysql-server",
@@ -102,10 +109,36 @@ class MySQLStudentStoreTests(unittest.TestCase):
 
         store._connect()
 
-        connect.assert_called_once()  # type: ignore[attr-defined]
-        call_kwargs = connect.call_args.kwargs  # type: ignore[attr-defined]
+        connect.assert_called_once()
+        call_kwargs = connect.call_args.kwargs
         self.assertEqual(call_kwargs["user"], "test_user")
         self.assertNotEqual(call_kwargs["user"], "root")
+
+    @patch("alt_web01.student_store.pymysql.connect")
+    def test_list_students_queries_latest_1000(self, connect: MagicMock) -> None:
+        """The database query should cap and order records before rendering."""
+        connection = connect.return_value
+        cursor = connection.cursor.return_value.__enter__.return_value
+        cursor.fetchall.return_value = []
+        store = MySQLStudentStore(
+            MySQLSettings("mysql-server", 3306, "test_db", "test_user", "pw")
+        )
+
+        self.assertEqual(store.list_students(), [])
+
+        query = cursor.execute.call_args.args[0]
+        self.assertIn("ORDER BY created_at DESC, id DESC", query)
+        self.assertIn("LIMIT 1000", query)
+
+
+class AgeCalculationTests(unittest.TestCase):
+    """Verify the dynamic calculated age column."""
+
+    def test_age_is_rounded_to_one_decimal_place(self) -> None:
+        """Age should be fractional between adjacent birthdays."""
+        age = _age_on(dt.date(2000, 1, 1), dt.date(2025, 7, 2))
+
+        self.assertEqual(age, 25.5)
 
 
 if __name__ == "__main__":
