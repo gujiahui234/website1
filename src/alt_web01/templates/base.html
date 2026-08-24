@@ -35,7 +35,7 @@
           <li class="nav-item dropdown">
             <a class="nav-link dropdown-toggle{{ ' active' if request.endpoint in ['pages.university_add', 'pages.major_group_add', 'pages.university_generate'] }}" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">大学</a>
             <ul class="dropdown-menu dropdown-menu-end">
-              <li><a class="dropdown-item" href="{{ url_for('pages.university_add') }}">手工添加大学</a></li>
+              <li><a class="dropdown-item" href="{{ url_for('pages.university_add') }}">手工增加大学</a></li>
               <li><a class="dropdown-item" href="{{ url_for('pages.major_group_add') }}">手工添加专业组</a></li>
               <li><a class="dropdown-item" href="{{ url_for('pages.university_generate') }}">自动添加大学和专业组</a></li>
             </ul>

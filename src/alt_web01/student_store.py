@@ -61,10 +61,13 @@ class MySQLSettings:
     @classmethod
     def from_config(cls, config: Mapping[str, object]) -> MySQLSettings:
         """Build validated settings from the Flask configuration."""
+        student_store = str(config.get("STUDENT_STORE", "memory")).strip()
         host = str(config.get("MYSQL_HOST", "")).strip()
         database = str(config.get("MYSQL_DATABASE", "")).strip()
         user = str(config.get("MYSQL_USER", "")).strip()
         password = str(config.get("MYSQL_PASSWORD", ""))
+
+        print(f"STUDENT_STORE={student_store}, MYSQL_HOST={host}, MYSQL_DATABASE={database}, MYSQL_USER={user}, MYSQL_PASSWORD={'*' * len(password)}")
 
         if user.casefold() == "root":
             raise RuntimeError("MYSQL_USER must be a non-root application account")
