@@ -11,11 +11,21 @@ from flask import Flask, Response, g, request
 from sclog_lite import logger, setup_logger, shutdown
 from werkzeug.exceptions import HTTPException
 
+from alt_web01.major_group_store import (
+    MajorGroupStore,
+    MemoryMajorGroupStore,
+    MySQLMajorGroupStore,
+)
 from alt_web01.student_store import (
     MemoryStudentStore,
     MySQLSettings,
     MySQLStudentStore,
     StudentStore,
+)
+from alt_web01.university_store import (
+    MemoryUniversityStore,
+    MySQLUniversityStore,
+    UniversityStore,
 )
 
 _logging_configured = False
@@ -89,15 +99,26 @@ def create_app(test_config: dict[str, object] | None = None) -> Flask:
         app.config.update(test_config)
 
     store_mode = str(app.config["STUDENT_STORE"]).strip().casefold()
-    store: StudentStore
+    student_store: StudentStore
+    university_store: UniversityStore
+    major_group_store: MajorGroupStore
     if store_mode == "mysql":
-        store = MySQLStudentStore(MySQLSettings.from_config(app.config))
-        store.ensure_schema()
+        settings = MySQLSettings.from_config(app.config)
+        student_store = MySQLStudentStore(settings)
+        university_store = MySQLUniversityStore(settings)
+        major_group_store = MySQLMajorGroupStore(settings)
+        student_store.ensure_schema()
+        university_store.ensure_schema()
+        major_group_store.ensure_schema()
     elif store_mode == "memory":
-        store = MemoryStudentStore()
+        student_store = MemoryStudentStore()
+        university_store = MemoryUniversityStore()
+        major_group_store = MemoryMajorGroupStore()
     else:
         raise RuntimeError("STUDENT_STORE must be either 'memory' or 'mysql'")
-    app.extensions["student_store"] = store
+    app.extensions["student_store"] = student_store
+    app.extensions["university_store"] = university_store
+    app.extensions["major_group_store"] = major_group_store
 
     from alt_web01.views import pages
 

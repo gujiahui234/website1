@@ -1,0 +1,130 @@
+{% extends "base.html" %}
+
+{% block title %}手工添加大学 · alt_web01{% endblock %}
+
+{% block vendor_styles %}
+  <link rel="stylesheet" href="https://cdn.datatables.net/3.0.2/css/dataTables.dataTables.css">
+{% endblock %}
+
+{% block content %}
+<section class="student-workspace" aria-labelledby="page-title">
+  <header class="student-heading">
+    <div>
+      <p class="page-kicker">大学 · 档案录入</p>
+      <h1 id="page-title">手工添加大学</h1>
+      <p class="student-intro">填写高校基本信息。高校名称与五位高校国标代码均不可重复。</p>
+    </div>
+    <div class="range-note" aria-label="高校代码格式">
+      <span>高校代码</span>
+      <strong>5 位数字</strong>
+    </div>
+  </header>
+
+  {% if saved %}
+    <div class="notice notice-success" role="status">
+      <span class="notice-mark" aria-hidden="true">✓</span>
+      高校保存成功，已加入下方清单。
+    </div>
+  {% endif %}
+  {% if error %}
+    <div class="notice notice-error" role="alert">{{ error }}</div>
+  {% endif %}
+
+  <div class="student-card">
+    <form method="post" class="student-form university-form">
+      <div class="form-field university-name-field">
+        <label for="name">高校名称</label>
+        <input id="name" name="name" type="text" value="{{ values.name }}" maxlength="100" autocomplete="organization" placeholder="例如：示例大学" required>
+      </div>
+      <div class="form-field">
+        <label for="code">高校代码</label>
+        <input id="code" name="code" type="text" inputmode="numeric" pattern="[0-9]{5}" value="{{ values.code }}" minlength="5" maxlength="5" placeholder="例如：10001" required>
+      </div>
+      <div class="form-field">
+        <label for="type">高校类型</label>
+        <select id="type" name="type" required>
+          <option value=""{{ ' selected' if not values.type }}>请选择</option>
+          <option value="民办"{{ ' selected' if values.type == '民办' }}>民办</option>
+          <option value="公办"{{ ' selected' if values.type == '公办' }}>公办</option>
+        </select>
+      </div>
+      <div class="form-field">
+        <label for="nature">高校性质</label>
+        <select id="nature" name="nature" required>
+          <option value=""{{ ' selected' if not values.nature }}>请选择</option>
+          <option value="985"{{ ' selected' if values.nature == '985' }}>985</option>
+          <option value="211"{{ ' selected' if values.nature == '211' }}>211</option>
+          <option value="一本"{{ ' selected' if values.nature == '一本' }}>一本</option>
+          <option value="其他"{{ ' selected' if values.nature == '其他' }}>其他</option>
+        </select>
+      </div>
+      <div class="form-actions">
+        <button class="button button-primary" type="submit">保存高校</button>
+      </div>
+    </form>
+  </div>
+
+  <section class="saved-roster" aria-labelledby="university-list-title">
+    <div class="roster-heading">
+      <div>
+        <p class="page-kicker">{{ "数据库记录" if persistent else "本次运行" }}</p>
+        <h2 id="university-list-title">已保存高校清单</h2>
+        <p class="roster-caption">显示全部已保存高校，可搜索、排序和分页。</p>
+      </div>
+      <span class="roster-count">{{ universities|length }} 所</span>
+    </div>
+
+    <div class="table-wrap">
+      <table id="universities-table" class="display student-data-table">
+        <thead>
+          <tr>
+            <th scope="col">序号</th>
+            <th scope="col">高校名称</th>
+            <th scope="col">高校代码</th>
+            <th scope="col">高校类型</th>
+            <th scope="col">高校性质</th>
+            <th scope="col">保存时间</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for university in universities %}
+            <tr>
+              <td><span class="student-number">{{ "%02d"|format(university.number) }}</span></td>
+              <td class="student-name">{{ university.name }}</td>
+              <td>{{ university.code }}</td>
+              <td>{{ university.type }}</td>
+              <td>{{ university.nature }}</td>
+              <td data-order="{{ university.saved_at.isoformat() }}">{{ university.saved_at.strftime("%Y-%m-%d %H:%M:%S") }}</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% if persistent %}
+      <p class="storage-note">数据已写入独立 MySQL 容器，应用重启后仍会保留。</p>
+    {% else %}
+      <p class="storage-note">当前为本地内存模式，重启后会清空。</p>
+    {% endif %}
+  </section>
+</section>
+{% endblock %}
+
+{% block scripts %}
+  <script src="https://cdn.datatables.net/3.0.2/js/dataTables.js"></script>
+  <script>
+    new DataTable("#universities-table", {
+      order: [[5, "desc"], [0, "desc"]],
+      pageLength: 25,
+      lengthMenu: [10, 25, 50, 100],
+      language: {
+        search: "搜索：",
+        lengthMenu: "每页显示 _MENU_ 条",
+        info: "显示第 _START_ 至 _END_ 条，共 _TOTAL_ 条",
+        infoEmpty: "暂无高校记录",
+        zeroRecords: "没有符合条件的高校",
+        emptyTable: "数据库中暂无高校数据",
+        paginate: { first: "首页", previous: "上一页", next: "下一页", last: "末页" }
+      }
+    });
+  </script>
+{% endblock %}

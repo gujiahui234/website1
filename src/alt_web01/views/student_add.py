@@ -1,4 +1,4 @@
-"""Page routes for the demonstration website."""
+"""Manual student creation page route and form helpers."""
 
 from __future__ import annotations
 
@@ -6,20 +6,12 @@ import datetime as dt
 from typing import cast
 
 from class_roster import simulate_class
-from flask import (
-    Blueprint,
-    current_app,
-    redirect,
-    render_template,
-    request,
-    url_for,
-)
+from flask import current_app, redirect, render_template, request, url_for
 from flask.typing import ResponseReturnValue
 from sclog_lite import logger
 
 from alt_web01.student_store import StudentStore
-
-pages = Blueprint("pages", __name__)
+from alt_web01.views import pages
 
 BIRTHDAY_MIN = dt.date(2000, 1, 1)
 BIRTHDAY_MAX = dt.date(2020, 12, 31)
@@ -49,27 +41,6 @@ def _age_on(birthday: dt.date, as_of: dt.date) -> float:
     elapsed_days = (as_of - previous_birthday).days
     year_days = (next_birthday - previous_birthday).days
     return round(completed_years + elapsed_days / year_days, 1)
-
-
-def render_page(page_name: str, page_kicker: str) -> str:
-    """Render a named placeholder page.
-
-    Args:
-        page_name: Visible page title.
-        page_kicker: Navigation group shown above the title.
-
-    Returns:
-        str: Rendered page HTML.
-    """
-    return render_template(
-        "page.html", page_name=page_name, page_kicker=page_kicker
-    )
-
-
-@pages.get("/")
-def home() -> str:
-    """Render the home page."""
-    return render_page("首页", "ALT · CAMPUS")
 
 
 def _student_store() -> StudentStore:
@@ -165,57 +136,3 @@ def student_add() -> ResponseReturnValue:
         student_number=student.number,
     ).info("学生保存成功")
     return redirect(url_for("pages.student_add", saved="1"))
-
-
-@pages.get("/students/import/small")
-def student_import_small() -> str:
-    """Render the small student import page."""
-    return render_page("批量添加学生（小数据量）", "学生")
-
-
-@pages.get("/students/import/large")
-def student_import_large() -> str:
-    """Render the large student import page."""
-    return render_page("批量添加学生（大数据量）", "学生")
-
-
-@pages.get("/universities/add")
-def university_add() -> str:
-    """Render the manual university creation page."""
-    return render_page("手工添加大学", "大学")
-
-
-@pages.get("/majors/add")
-def major_group_add() -> str:
-    """Render the manual major group creation page."""
-    return render_page("手工添加专业组", "大学")
-
-
-@pages.get("/universities/generate")
-def university_generate() -> str:
-    """Render the automatic university and major group page."""
-    return render_page("自动添加大学和专业组", "大学")
-
-
-@pages.get("/enrollment/manual")
-def enrollment_manual() -> str:
-    """Render the manual enrollment page."""
-    return render_page("手动入学", "入学")
-
-
-@pages.get("/enrollment/automatic")
-def enrollment_automatic() -> str:
-    """Render the automatic enrollment page."""
-    return render_page("自动入学", "入学")
-
-
-@pages.get("/analytics/students-by-year")
-def analytics_students_by_year() -> str:
-    """Render the yearly student count page."""
-    return render_page("历年学生数量统计", "统计分析")
-
-
-@pages.get("/analytics/students-by-university")
-def analytics_students_by_university() -> str:
-    """Render the university student count page."""
-    return render_page("各大学学生数量统计", "统计分析")

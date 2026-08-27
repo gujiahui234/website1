@@ -1,0 +1,141 @@
+{% extends "base.html" %}
+
+{% block title %}手工添加专业组 · alt_web01{% endblock %}
+
+{% block vendor_styles %}
+  <link rel="stylesheet" href="https://cdn.datatables.net/3.0.2/css/dataTables.dataTables.css">
+{% endblock %}
+
+{% block content %}
+<section class="student-workspace" aria-labelledby="page-title">
+  <header class="student-heading">
+    <div>
+      <p class="page-kicker">大学 · 专业组管理</p>
+      <h1 id="page-title">手工添加专业组</h1>
+      <p class="student-intro">选择高校后，为其添加专业组；名称和二至五位代码在同一所高校内不可重复。</p>
+    </div>
+    <div class="range-note" aria-label="专业组代码格式">
+      <span>专业组代码</span>
+      <strong>2 — 5 位数字</strong>
+    </div>
+  </header>
+
+  {% if saved %}
+    <div class="notice notice-success" role="status">
+      <span class="notice-mark" aria-hidden="true">✓</span>
+      专业组保存成功，已加入下方清单。
+    </div>
+  {% endif %}
+  {% if error %}
+    <div class="notice notice-error" role="alert">{{ error }}</div>
+  {% endif %}
+
+  {% if universities %}
+    <div class="student-card selector-card">
+      <form method="get" class="selector-form">
+        <div class="form-field">
+          <label for="university-selector">选择高校</label>
+          <select id="university-selector" name="university_id" onchange="this.form.submit()" required>
+            {% for university in universities %}
+              <option value="{{ university.number }}"{{ ' selected' if selected_university and university.number == selected_university.number }}>
+                {{ university.code }} · {{ university.name }}
+              </option>
+            {% endfor %}
+          </select>
+        </div>
+        <button class="button button-secondary" type="submit">读取专业组</button>
+      </form>
+    </div>
+
+    {% if selected_university %}
+      <div class="student-card">
+        <form method="post" class="student-form major-group-form">
+          <input type="hidden" name="university_id" value="{{ selected_university.number }}">
+          <div class="form-field university-name-field">
+            <label for="name">专业组名称</label>
+            <input id="name" name="name" type="text" value="{{ values.name }}" maxlength="100" placeholder="例如：计算机类" required>
+          </div>
+          <div class="form-field">
+            <label for="code">专业组代码</label>
+            <input id="code" name="code" type="text" inputmode="numeric" pattern="[0-9]{2,5}" value="{{ values.code }}" minlength="2" maxlength="5" placeholder="例如：01、101 或 19801" required>
+          </div>
+          <div class="form-actions">
+            <button class="button button-primary" type="submit">保存专业组</button>
+          </div>
+        </form>
+      </div>
+    {% endif %}
+  {% else %}
+    <div class="notice notice-error" role="alert">
+      暂无可选高校，请先<a href="{{ url_for('pages.university_add') }}">添加高校</a>。
+    </div>
+  {% endif %}
+
+  <section class="saved-roster" aria-labelledby="major-group-list-title">
+    <div class="roster-heading">
+      <div>
+        <p class="page-kicker">{{ "数据库记录" if persistent else "本次运行" }}</p>
+        <h2 id="major-group-list-title">已保存专业组清单</h2>
+        <p class="roster-caption">
+          {% if selected_university %}
+            {{ selected_university.name }} · 显示该校全部专业组
+          {% else %}
+            选择高校后显示其全部专业组
+          {% endif %}
+        </p>
+      </div>
+      <span class="roster-count">{{ major_groups|length }} 个</span>
+    </div>
+
+    <div class="table-wrap">
+      <table id="major-groups-table" class="display student-data-table">
+        <thead>
+          <tr>
+            <th scope="col">序号</th>
+            <th scope="col">高校</th>
+            <th scope="col">专业组名称</th>
+            <th scope="col">专业组代码</th>
+            <th scope="col">保存时间</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for major_group in major_groups %}
+            <tr>
+              <td><span class="student-number">{{ "%02d"|format(major_group.number) }}</span></td>
+              <td>{{ major_group.university_name }}</td>
+              <td class="student-name">{{ major_group.name }}</td>
+              <td>{{ major_group.code }}</td>
+              <td data-order="{{ major_group.saved_at.isoformat() }}">{{ major_group.saved_at.strftime("%Y-%m-%d %H:%M:%S") }}</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% if persistent %}
+      <p class="storage-note">数据已写入独立 MySQL 容器，应用重启后仍会保留。</p>
+    {% else %}
+      <p class="storage-note">当前为本地内存模式，重启后会清空。</p>
+    {% endif %}
+  </section>
+</section>
+{% endblock %}
+
+{% block scripts %}
+  <script src="https://cdn.datatables.net/3.0.2/js/dataTables.js"></script>
+  <script>
+    new DataTable("#major-groups-table", {
+      order: [[4, "desc"], [0, "desc"]],
+      pageLength: 25,
+      lengthMenu: [10, 25, 50, 100],
+      language: {
+        search: "搜索：",
+        lengthMenu: "每页显示 _MENU_ 条",
+        info: "显示第 _START_ 至 _END_ 条，共 _TOTAL_ 条",
+        infoEmpty: "暂无专业组记录",
+        zeroRecords: "没有符合条件的专业组",
+        emptyTable: "该高校暂无专业组数据",
+        paginate: { first: "首页", previous: "上一页", next: "下一页", last: "末页" }
+      }
+    });
+  </script>
+{% endblock %}

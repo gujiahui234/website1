@@ -330,6 +330,23 @@ body {
   align-items: end;
 }
 
+.university-form {
+  grid-template-columns: 1.5fr 0.65fr 0.8fr 0.8fr;
+}
+
+.major-group-form {
+  grid-template-columns: 1.5fr 0.7fr;
+}
+
+.selector-card { margin-bottom: 1.5rem; }
+
+.selector-form {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 1rem;
+  align-items: end;
+}
+
 .form-field label {
   display: block;
   margin-bottom: 0.55rem;
@@ -476,6 +493,9 @@ body {
   .student-card,
   .saved-roster { padding: 1.25rem; border-radius: 1.2rem; }
   .student-form { grid-template-columns: 1fr; }
+  .university-form { grid-template-columns: 1fr; }
+  .major-group-form { grid-template-columns: 1fr; }
+  .selector-form { grid-template-columns: 1fr; }
   .form-actions { flex-direction: column-reverse; }
   .button { width: 100%; }
 }
@@ -483,6 +503,7 @@ body {
 @media (min-width: 576px) and (max-width: 860px) {
   .student-form { grid-template-columns: 1fr 1fr; }
   .form-field-name { grid-column: 1 / -1; }
+  .university-name-field { grid-column: 1 / -1; }
 }
 
 @media (prefers-reduced-motion: reduce) {

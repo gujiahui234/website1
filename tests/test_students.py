@@ -9,7 +9,66 @@ from unittest.mock import MagicMock, patch
 
 from alt_web01 import create_app
 from alt_web01.student_store import MySQLSettings, MySQLStudentStore
-from alt_web01.views import _age_on
+from alt_web01.views.student_add import _age_on
+
+
+class RouteContractTests(unittest.TestCase):
+    """Ensure modularization preserves every public page route."""
+
+    def setUp(self) -> None:
+        """Create an application with an isolated in-memory store."""
+        self.app = create_app({"STUDENT_STORE": "memory", "TESTING": True})
+        self.client = self.app.test_client()
+
+    def test_page_endpoints_and_paths_are_unchanged(self) -> None:
+        """All page endpoints should remain registered exactly once."""
+        expected_routes = {
+            ("pages.home", "/"),
+            ("pages.student_add", "/students/add"),
+            ("pages.student_import_small", "/students/import/small"),
+            ("pages.student_import_large", "/students/import/large"),
+            ("pages.university_add", "/universities/add"),
+            ("pages.major_group_add", "/majors/add"),
+            ("pages.university_generate", "/universities/generate"),
+            ("pages.enrollment_manual", "/enrollment/manual"),
+            ("pages.enrollment_automatic", "/enrollment/automatic"),
+            (
+                "pages.analytics_students_by_year",
+                "/analytics/students-by-year",
+            ),
+            (
+                "pages.analytics_students_by_university",
+                "/analytics/students-by-university",
+            ),
+        }
+        actual_routes = [
+            (rule.endpoint, rule.rule)
+            for rule in self.app.url_map.iter_rules()
+            if rule.endpoint.startswith("pages.")
+        ]
+
+        self.assertEqual(len(actual_routes), len(expected_routes))
+        self.assertEqual(set(actual_routes), expected_routes)
+
+    def test_every_page_get_request_succeeds(self) -> None:
+        """Each modularized page should still render successfully."""
+        paths = [
+            "/",
+            "/students/add",
+            "/students/import/small",
+            "/students/import/large",
+            "/universities/add",
+            "/majors/add",
+            "/universities/generate",
+            "/enrollment/manual",
+            "/enrollment/automatic",
+            "/analytics/students-by-year",
+            "/analytics/students-by-university",
+        ]
+
+        for path in paths:
+            with self.subTest(path=path):
+                self.assertEqual(self.client.get(path).status_code, 200)
 
 
 class StudentWorkflowTests(unittest.TestCase):
