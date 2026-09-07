@@ -1,0 +1,231 @@
+{% extends "base.html" %}
+
+{% block title %}批量添加学生（大数据量） · alt_web01{% endblock %}
+
+{% block content %}
+<section class="student-workspace" aria-labelledby="page-title">
+  <header class="student-heading">
+    <div>
+      <p class="page-kicker">学生 · 海量数据生成</p>
+      <h1 id="page-title">批量添加学生（大数据量）</h1>
+      <p class="student-intro">
+        通过 Celery 任务平台异步生成大批量模拟学生，生成期间可离开页面稍后查看结果。
+      </p>
+    </div>
+    <div class="range-note" aria-label="允许生成的人数上限">
+      <span>人数上限</span>
+      <strong>{{ "{:,}".format(max_students) }}</strong>
+    </div>
+  </header>
+
+  <div class="student-card">
+    <form id="generate-form" class="student-form">
+      <div class="form-field">
+        <label for="numbers">要生成的人数</label>
+        <input id="numbers" name="numbers" type="number" min="1" max="{{ max_students }}" step="1"
+               placeholder="例如：1000000" required>
+      </div>
+      <div class="form-field">
+        <label for="birthday-min">出生年月日区间（最小值）</label>
+        <input id="birthday-min" name="birthday_min" type="text" placeholder="例如：1995-01-01">
+      </div>
+      <div class="form-field">
+        <label for="birthday-max">出生年月日区间（最大值）</label>
+        <input id="birthday-max" name="birthday_max" type="text" placeholder="例如：2010-12-31">
+      </div>
+      <div class="form-actions">
+        <button class="button button-primary" id="generate-button" type="submit">生成</button>
+        <button class="button button-secondary" id="result-button" type="button" hidden>查看结果</button>
+      </div>
+    </form>
+  </div>
+
+  <div id="status-area" aria-live="polite"></div>
+  <div id="result-area" aria-live="polite"></div>
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script>
+(function () {
+  "use strict";
+
+  var form = document.getElementById("generate-form");
+  var generateButton = document.getElementById("generate-button");
+  var resultButton = document.getElementById("result-button");
+  var statusArea = document.getElementById("status-area");
+  var resultArea = document.getElementById("result-area");
+
+  var taskId = null;
+  var generating = false;
+  var pollTimer = null;
+
+  var POLL_INTERVAL_MS = 5000;
+
+  function formatNumber(value) {
+    return Number(value).toLocaleString("zh-CN");
+  }
+
+  function stopPolling() {
+    if (pollTimer !== null) {
+      window.clearInterval(pollTimer);
+      pollTimer = null;
+    }
+  }
+
+  function startPolling() {
+    stopPolling();
+    pollTimer = window.setInterval(function () { fetchResult(); }, POLL_INTERVAL_MS);
+  }
+
+  function requestNotifyPermission() {
+    if ("Notification" in window && Notification.permission === "default") {
+      Notification.requestPermission();
+    }
+  }
+
+  function notifyDone(inserted) {
+    if (!("Notification" in window) || Notification.permission !== "granted") {
+      return;
+    }
+    var notification = new Notification("批量生成学生完成", {
+      body: "本次共生成 " + formatNumber(inserted || 0) + " 名学生，点击查看结果。",
+    });
+    notification.onclick = function () {
+      window.focus();
+      resultArea.scrollIntoView({ behavior: "smooth", block: "start" });
+      notification.close();
+    };
+  }
+
+  function setStatus(html) {
+    statusArea.innerHTML = html;
+  }
+
+  function showNotice(text, kind) {
+    return '<div class="notice notice-' + kind + '" role="status">' + text + "</div>";
+  }
+
+  function renderStudentsTable(students) {
+    if (!students || students.length === 0) {
+      return '<p class="storage-note">暂未读取到学生记录。</p>';
+    }
+    var rows = students.map(function (student) {
+      return "<tr>" +
+        "<td>" + student.number + "</td>" +
+        "<td>" + student.name + "</td>" +
+        "<td>" + student.gender + "</td>" +
+        "<td>" + student.birthday + "</td>" +
+        "</tr>";
+    }).join("");
+    return '<div class="table-wrap"><table class="student-data-table">' +
+      "<thead><tr><th>学号</th><th>姓名</th><th>性别</th><th>出生日期</th></tr></thead>" +
+      "<tbody>" + rows + "</tbody></table></div>";
+  }
+
+  function finishGeneration() {
+    generating = false;
+    generateButton.disabled = false;
+    // The "正在生成中" banner becomes stale once the task is finished.
+    statusArea.innerHTML = "";
+  }
+
+  function fetchResult() {
+    if (!taskId) { return; }
+    resultButton.disabled = true;
+    fetch("/students/import/large/result?task_id=" + encodeURIComponent(taskId))
+      .then(function (response) { return response.json(); })
+      .then(function (data) {
+        resultButton.disabled = false;
+        if (data.error) {
+          stopPolling();
+          finishGeneration();
+          resultArea.innerHTML = showNotice(data.error, "error");
+          return;
+        }
+        if (data.state === "SUCCESS") {
+          stopPolling();
+          finishGeneration();
+          notifyDone(data.inserted || 0);
+          var summary =
+            "<p>本次生成学生人数：<strong>" + formatNumber(data.inserted || 0) + "</strong> 人</p>" +
+            (data.elapsed_seconds != null ? "<p>耗时：" + data.elapsed_seconds + " 秒</p>" : "");
+          resultArea.innerHTML = showNotice("生成完成", "success") +
+            '<section class="saved-roster"><div class="roster-heading"><div>' +
+            '<p class="page-kicker">生成结果</p><h2>最新 1,000 名学生</h2></div>' +
+            '<span class="roster-count">' + formatNumber((data.students || []).length) + " 条</span></div>" +
+            summary + renderStudentsTable(data.students) + "</section>";
+          return;
+        }
+        if (data.state === "PROGRESS") {
+          resultArea.innerHTML = showNotice(
+            "正在生成中，已写入 " + formatNumber(data.inserted || 0) + " 名学生…", "info");
+          return;
+        }
+        resultArea.innerHTML = showNotice("正在生成中，请稍候再点击“查看结果”…", "info");
+      })
+      .catch(function () {
+        resultButton.disabled = false;
+        resultArea.innerHTML = showNotice("查询结果失败，请稍后重试。", "error");
+      })
+      .finally(function () {
+        if (pollTimer === null && generating) {
+          // A transient network hiccup must not silently kill auto polling.
+          startPolling();
+        }
+      });
+  }
+
+  form.addEventListener("submit", function (event) {
+    event.preventDefault();
+    if (generating) { return; }
+
+    var numbers = form.elements["numbers"].value.trim();
+    var birthdayMin = form.elements["birthday_min"].value.trim();
+    var birthdayMax = form.elements["birthday_max"].value.trim();
+    var count = Number(numbers);
+    if (!Number.isInteger(count) || count < 1 || count > {{ max_students }}) {
+      setStatus(showNotice("要生成的人数必须是 1 到 {{ "{:,}".format(max_students) }} 之间的整数。", "error"));
+      return;
+    }
+
+    generating = true;
+    generateButton.disabled = true;
+    resultButton.hidden = true;
+    resultArea.innerHTML = "";
+    setStatus(
+      '<div class="notice notice-info" role="status">' +
+      '<span class="spinner-border spinner-border-sm" aria-hidden="true"></span> ' +
+      "正在生成中，任务已提交到 Celery 平台，请稍候…</div>"
+    );
+
+    var body = new FormData();
+    body.append("numbers", numbers);
+    body.append("birthday_min", birthdayMin);
+    body.append("birthday_max", birthdayMax);
+
+    fetch("{{ url_for('pages.student_import_large_start') }}", { method: "POST", body: body })
+      .then(function (response) {
+        return response.json().then(function (data) {
+          if (!response.ok) { throw new Error(data.error || "任务投递失败。"); }
+          return data;
+        });
+      })
+      .then(function (data) {
+        taskId = data.task_id;
+        resultButton.hidden = false;
+        resultArea.innerHTML = showNotice(
+          "任务已提交，生成完成后将自动通知；也可点击“查看结果”获取生成进度与结果。", "info");
+        requestNotifyPermission();
+        startPolling();
+      })
+      .catch(function (error) {
+        finishGeneration();
+        setStatus(showNotice(error.message, "error"));
+      });
+  });
+
+  resultButton.addEventListener("click", fetchResult);
+})();
+</script>
+{% endblock %}

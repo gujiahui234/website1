@@ -12,6 +12,13 @@ services:
       MYSQL_DATABASE: "${MYSQL_DATABASE:-test_db}"
       MYSQL_USER: "${MYSQL_USER:-test_user}"
       MYSQL_PASSWORD: "${MYSQL_PASSWORD:?MYSQL_PASSWORD must be set in .env}"
+      CELERY_BROKER_URL: "${CELERY_BROKER_URL:?CELERY_BROKER_URL must be set in .env}"
+      CELERY_RESULT_BACKEND: "${CELERY_RESULT_BACKEND:?CELERY_RESULT_BACKEND must be set in .env}"
+      MYSQL_WEB_HOST: "${MYSQL_WEB_HOST:-mysql-server}"
+      MYSQL_WEB_PORT: "${MYSQL_WEB_PORT:-3306}"
+      MYSQL_WEB_DATABASE: "${MYSQL_WEB_DATABASE:-web_db}"
+      MYSQL_WEB_USER: "${MYSQL_WEB_USER:-web_user}"
+      MYSQL_WEB_PASSWORD: "${MYSQL_WEB_PASSWORD:?MYSQL_WEB_PASSWORD must be set in .env}"
     networks:
       - default
       - app-network

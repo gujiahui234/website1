@@ -94,6 +94,12 @@ def create_app(test_config: dict[str, object] | None = None) -> Flask:
         MYSQL_DATABASE=os.getenv("MYSQL_DATABASE", ""),
         MYSQL_USER=os.getenv("MYSQL_USER", ""),
         MYSQL_PASSWORD=os.getenv("MYSQL_PASSWORD", ""),
+        # Celery 平台 web_db 业务库（批量生成结果所在库）。
+        MYSQL_WEB_HOST=os.getenv("MYSQL_WEB_HOST", ""),
+        MYSQL_WEB_PORT=os.getenv("MYSQL_WEB_PORT", "3306"),
+        MYSQL_WEB_DATABASE=os.getenv("MYSQL_WEB_DATABASE", "web_db"),
+        MYSQL_WEB_USER=os.getenv("MYSQL_WEB_USER", ""),
+        MYSQL_WEB_PASSWORD=os.getenv("MYSQL_WEB_PASSWORD", ""),
     )
     if test_config is not None:
         app.config.update(test_config)

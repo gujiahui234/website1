@@ -39,6 +39,11 @@ body {
 .skip-link:focus { transform: translateY(0); }
 
 .campus-navbar {
+  position: relative;
+  /* Keep the navbar (and its dropdown buttons) above page sections such as
+     the homepage ``.campus-stage`` whose ``isolation: isolate`` creates a
+     stacking context painted after the ``backdrop-filter`` navbar context. */
+  z-index: 1030;
   min-height: 5rem;
   background: rgb(255 255 255 / 82%);
   border-bottom: 1px solid rgb(23 59 79 / 8%);
@@ -296,6 +301,7 @@ body {
 
 .notice-success { color: #0b5c4e; background: #dcf7ed; }
 .notice-error { color: #8c2e32; background: #ffeaeb; }
+.notice-info { color: #14586e; background: #e3f1fb; }
 .notice-mark { margin-right: 0.45rem; }
 
 .student-card,

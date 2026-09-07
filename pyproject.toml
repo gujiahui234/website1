@@ -19,8 +19,16 @@ dependencies = [
     "Flask>=3.1,<4",
     "gunicorn>=23,<24",
     "PyMySQL>=1.1,<2",
+    "celery[redis]>=5.6,<6",
+    "python-dotenv>=1.1,<2",
     "class-roster-simulator @ git+https://github.com/gujiahui234/class_roster_simulator-0.1.0.git@ver0.2.0",
     "sclog_lite @  git+https://github.com/gujiahui234/sclog_lite.git@ver0.3.0"
+]
+
+[project.optional-dependencies]
+dev = [
+    "mypy>=1.14,<2",
+    "pytest>=8,<9",
 ]
 
 [tool.hatch.metadata]

@@ -27,6 +27,14 @@ class RouteContractTests(unittest.TestCase):
             ("pages.student_add", "/students/add"),
             ("pages.student_import_small", "/students/import/small"),
             ("pages.student_import_large", "/students/import/large"),
+            (
+                "pages.student_import_large_start",
+                "/students/import/large/start",
+            ),
+            (
+                "pages.student_import_large_result",
+                "/students/import/large/result",
+            ),
             ("pages.university_add", "/universities/add"),
             ("pages.major_group_add", "/majors/add"),
             ("pages.university_generate", "/universities/generate"),
@@ -135,6 +143,96 @@ class StudentWorkflowTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertIn("生日必须在 2000 年至 2020 年之间", page)
         self.assertNotIn("<td class=\"student-name\">越界学生</td>", page)
+
+
+class LargeImportWorkflowTests(unittest.TestCase):
+    """Exercise the Celery-backed large student import workflow."""
+
+    def setUp(self) -> None:
+        """Create an application with an isolated in-memory store."""
+        self.app = create_app({"STUDENT_STORE": "memory", "TESTING": True})
+        self.client = self.app.test_client()
+
+    def test_start_rejects_out_of_range_numbers(self) -> None:
+        """Numbers below 1 or above 1 亿 must be rejected without dispatching."""
+        for numbers in ("0", "-5", "100000001", "abc"):
+            with self.subTest(numbers=numbers):
+                response = self.client.post(
+                    "/students/import/large/start", data={"numbers": numbers}
+                )
+                self.assertEqual(response.status_code, 400)
+
+    def test_start_requires_paired_birthday_boundaries(self) -> None:
+        """Birthday min/max must be provided together."""
+        response = self.client.post(
+            "/students/import/large/start",
+            data={"numbers": "10", "birthday_min": "2000"},
+        )
+        self.assertEqual(response.status_code, 400)
+
+    def test_start_rejects_invalid_birthday_format(self) -> None:
+        """Only YYYY / YYYY-MM / YYYY-MM-DD boundaries are accepted."""
+        response = self.client.post(
+            "/students/import/large/start",
+            data={"numbers": "10", "birthday_min": "2000-13-01", "birthday_max": "2010"},
+        )
+        self.assertEqual(response.status_code, 400)
+
+    @patch("alt_web01.views.student_import_large.get_celery_app")
+    def test_start_dispatches_platform_task(self, get_celery_app: MagicMock) -> None:
+        """A valid request should publish the generate_many_students task."""
+        celery = get_celery_app.return_value
+        celery.send_task.return_value.id = "task-42"
+
+        response = self.client.post(
+            "/students/import/large/start",
+            data={
+                "numbers": "100",
+                "birthday_min": "2000-01-01",
+                "birthday_max": "2010-12-31",
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.get_json()["task_id"], "task-42")
+        kwargs = celery.send_task.call_args.kwargs["kwargs"]
+        self.assertEqual(kwargs["numbers"], 100)
+        self.assertEqual(kwargs["birthday_min"], "2000-01-01")
+        self.assertEqual(kwargs["birthday_max"], "2010-12-31")
+
+    @patch("alt_web01.views.student_import_large.list_recent_students")
+    @patch("alt_web01.views.student_import_large.get_celery_app")
+    def test_result_reports_inserted_students(
+        self, get_celery_app: MagicMock, list_recent: MagicMock
+    ) -> None:
+        """A successful task should expose the inserted count and roster."""
+        async_result = get_celery_app.return_value.AsyncResult.return_value
+        async_result.state = "SUCCESS"
+        async_result.result = {"ok": True, "inserted": 5, "number_start": 1}
+        list_recent.return_value = []
+
+        response = self.client.get("/students/import/large/result?task_id=task-42")
+
+        self.assertEqual(response.status_code, 200)
+        data = response.get_json()
+        self.assertEqual(data["state"], "SUCCESS")
+        self.assertEqual(data["inserted"], 5)
+
+    @patch("alt_web01.views.student_import_large.get_celery_app")
+    def test_result_reports_progress_state(
+        self, get_celery_app: MagicMock
+    ) -> None:
+        """A running task should stay in the generating state."""
+        async_result = get_celery_app.return_value.AsyncResult.return_value
+        async_result.state = "PROGRESS"
+        async_result.info = {"inserted": 1200}
+
+        response = self.client.get("/students/import/large/result?task_id=task-42")
+
+        self.assertEqual(response.status_code, 200)
+        data = response.get_json()
+        self.assertEqual(data["state"], "PROGRESS")
+        self.assertEqual(data["inserted"], 1200)
 
 
 class MySQLStudentStoreTests(unittest.TestCase):
