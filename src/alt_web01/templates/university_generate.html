@@ -1,0 +1,217 @@
+{% extends "base.html" %}
+
+{% block title %}自动添加大学和专业组 · alt_web01{% endblock %}
+
+{% block content %}
+<section class="student-workspace" aria-labelledby="page-title">
+  <header class="student-heading">
+    <div>
+      <p class="page-kicker">大学 · 自动采集</p>
+      <h1 id="page-title">自动添加大学和专业组</h1>
+      <p class="student-intro">
+        通过 Celery 任务平台调用大模型自动采集高校与专业组信息并入库（按名称查重，重复的自动跳过）。
+      </p>
+    </div>
+    <div class="range-note" aria-label="单次采集数量上限">
+      <span>单次上限</span>
+      <strong>{{ max_universities }}</strong>
+    </div>
+  </header>
+
+  <div class="student-card">
+    <form id="generate-form" class="student-form">
+      <div class="form-field">
+        <label for="count">要采集的高校数量</label>
+        <input id="count" name="count" type="number" min="1" max="{{ max_universities }}" step="1"
+               value="3" required>
+      </div>
+      <div class="form-actions">
+        <button class="button button-primary" id="generate-button" type="submit">开始采集</button>
+        <button class="button button-secondary" id="result-button" type="button" hidden>查看结果</button>
+      </div>
+    </form>
+  </div>
+
+  <div id="status-area" aria-live="polite"></div>
+  <div id="result-area" aria-live="polite"></div>
+
+  {% if recent %}
+  <section class="saved-roster">
+    <div class="roster-heading">
+      <div>
+        <p class="page-kicker">数据库现有高校</p>
+        <h2>最近 {{ recent | length }} 所</h2>
+      </div>
+      <span class="roster-count">{{ recent | length }} 条</span>
+    </div>
+    <div class="table-wrap">
+      <table class="student-data-table">
+        <thead><tr><th>#</th><th>高校名称</th><th>代码</th><th>分类</th><th>性质</th></tr></thead>
+        <tbody>
+        {% for u in recent %}
+          <tr>
+            <td>{{ loop.index }}</td>
+            <td>{{ u.name }}</td>
+            <td>{{ u.code }}</td>
+            <td>{{ u.type }}</td>
+            <td>{{ u.nature }}</td>
+          </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+  {% endif %}
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script>
+(function () {
+  "use strict";
+
+  var form = document.getElementById("generate-form");
+  var generateButton = document.getElementById("generate-button");
+  var resultButton = document.getElementById("result-button");
+  var statusArea = document.getElementById("status-area");
+  var resultArea = document.getElementById("result-area");
+
+  var taskId = null;
+  var generating = false;
+  var pollTimer = null;
+
+  var POLL_INTERVAL_MS = 5000;
+
+  function stopPolling() {
+    if (pollTimer !== null) {
+      window.clearInterval(pollTimer);
+      pollTimer = null;
+    }
+  }
+
+  function startPolling() {
+    stopPolling();
+    pollTimer = window.setInterval(function () { fetchResult(); }, POLL_INTERVAL_MS);
+  }
+
+  function setStatus(html) {
+    statusArea.innerHTML = html;
+  }
+
+  function showNotice(text, kind) {
+    return '<div class="notice notice-' + kind + '" role="status">' + text + "</div>";
+  }
+
+  function renderUniversitiesTable(universities) {
+    if (!universities || universities.length === 0) {
+      return '<p class="storage-note">本次没有新增高校（可能全部与数据库重复）。</p>';
+    }
+    var rows = universities.map(function (u) {
+      var majors = (u.majors || []).map(function (m) { return m.name; }).join("、");
+      return "<tr>" +
+        "<td>" + (u.name || "") + "</td>" +
+        "<td>" + (u.code || "") + "</td>" +
+        "<td>" + (u.type || "") + "</td>" +
+        "<td>" + (u.nature || "") + "</td>" +
+        "<td>" + (majors || "—") + "</td>" +
+        "</tr>";
+    }).join("");
+    return '<div class="table-wrap"><table class="student-data-table">' +
+      "<thead><tr><th>高校名称</th><th>代码</th><th>分类</th><th>性质</th><th>专业组</th></tr></thead>" +
+      "<tbody>" + rows + "</tbody></table></div>";
+  }
+
+  function finishGeneration() {
+    generating = false;
+    generateButton.disabled = false;
+    statusArea.innerHTML = "";
+  }
+
+  function fetchResult() {
+    if (!taskId) { return; }
+    resultButton.disabled = true;
+    fetch("/universities/generate/result?task_id=" + encodeURIComponent(taskId))
+      .then(function (response) { return response.json(); })
+      .then(function (data) {
+        resultButton.disabled = false;
+        if (data.error) {
+          stopPolling();
+          finishGeneration();
+          resultArea.innerHTML = showNotice(data.error, "error");
+          return;
+        }
+        if (data.state === "SUCCESS") {
+          stopPolling();
+          finishGeneration();
+          var summary =
+            "<p>模型返回：<strong>" + (data.fetched || 0) + "</strong> 所 · " +
+            "新增高校：<strong>" + (data.inserted_universities || 0) + "</strong> 所 · " +
+            "新增专业组：<strong>" + (data.inserted_major_groups || 0) + "</strong> 个</p>" +
+            "<p>跳过重复：高校 " + (data.skipped_universities || 0) + " 所、专业组 " +
+            (data.skipped_major_groups || 0) + " 个</p>";
+          resultArea.innerHTML = showNotice("采集完成", "success") +
+            '<section class="saved-roster"><div class="roster-heading"><div>' +
+            '<p class="page-kicker">本次采集结果</p><h2>新增高校</h2></div></div>' +
+            summary + renderUniversitiesTable(data.universities) + "</section>";
+          return;
+        }
+        resultArea.innerHTML = showNotice("正在采集中，请稍候…", "info");
+      })
+      .catch(function () {
+        resultButton.disabled = false;
+        resultArea.innerHTML = showNotice("查询结果失败，请稍后重试。", "error");
+      })
+      .finally(function () {
+        if (pollTimer === null && generating) {
+          startPolling();
+        }
+      });
+  }
+
+  form.addEventListener("submit", function (event) {
+    event.preventDefault();
+    if (generating) { return; }
+
+    var count = Number(form.elements["count"].value);
+    if (!Number.isInteger(count) || count < 1 || count > {{ max_universities }}) {
+      setStatus(showNotice("要采集的高校数量必须是 1 到 {{ max_universities }} 之间的整数。", "error"));
+      return;
+    }
+
+    generating = true;
+    generateButton.disabled = true;
+    resultButton.hidden = true;
+    resultArea.innerHTML = "";
+    setStatus(
+      '<div class="notice notice-info" role="status">' +
+      '<span class="spinner-border spinner-border-sm" aria-hidden="true"></span> ' +
+      "任务已提交到 Celery 平台，正在采集中，请稍候…</div>"
+    );
+
+    var body = new FormData();
+    body.append("count", String(count));
+
+    fetch("{{ url_for('pages.university_generate_start') }}", { method: "POST", body: body })
+      .then(function (response) {
+        return response.json().then(function (data) {
+          if (!response.ok) { throw new Error(data.error || "任务投递失败。"); }
+          return data;
+        });
+      })
+      .then(function (data) {
+        taskId = data.task_id;
+        resultButton.hidden = false;
+        resultArea.innerHTML = showNotice(
+          "任务已提交，采集完成后结果会自动显示；也可点击“查看结果”获取进度。", "info");
+        startPolling();
+      })
+      .catch(function (error) {
+        finishGeneration();
+        setStatus(showNotice(error.message, "error"));
+      });
+  });
+
+  resultButton.addEventListener("click", fetchResult);
+})();
+</script>
+{% endblock %}

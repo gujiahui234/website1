@@ -18,6 +18,10 @@ from dotenv import load_dotenv
 #: alt_celery3 platform (see ``app/config.py`` of alt_celery3).
 GENERATE_MANY_STUDENTS_TASK = "tasks.db.generate_many_students"
 
+#: Canonical name of the automatic university + major-group collection task
+#: (SiliconFlow LLM powered, see ``app/tasks/ai_tasks.py`` of alt_celery3).
+GET_UN_GROUPS_TASK = "tasks.ai.get_un_groups"
+
 #: Hard upper bound of students a single request may generate (1 亿).
 MAX_STUDENTS = 100_000_000
 
