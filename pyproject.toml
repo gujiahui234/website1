@@ -21,8 +21,11 @@ dependencies = [
     "PyMySQL>=1.1,<2",
     "celery[redis]>=5.6,<6",
     "python-dotenv>=1.1,<2",
-    "class-roster-simulator @ git+https://github.com/gujiahui234/class_roster_simulator-0.1.0.git@ver0.2.0",
-    "sclog_lite @  git+https://github.com/gujiahui234/sclog_lite.git@ver0.3.0"
+    # Plain version constraints (no git+https direct URLs): these packages
+    # ship as pre-built wheels in wheelhouse/ (see Dockerfile) because some
+    # build hosts cannot reach github.com.
+    "class-roster-simulator>=0.2.1",
+    "sclog-lite>=0.3.0",
 ]
 
 [project.optional-dependencies]

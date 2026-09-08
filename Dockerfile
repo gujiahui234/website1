@@ -1,6 +1,4 @@
 FROM python:3.13-slim
-#install git
-RUN apt-get update && apt-get install -y git
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1
@@ -9,11 +7,16 @@ WORKDIR /app
 
 RUN addgroup --system app && adduser --system --ingroup app app
 
+# NOTE: no git on purpose — the GitHub-hosted dependencies
+# (class-roster-simulator, sclog_lite) come from the committed wheelhouse/
+# directory so the build never needs to reach github.com. PyPI access is
+# still required for Flask/celery/etc.
 COPY pyproject.toml README.md LICENSE ./
+COPY wheelhouse ./wheelhouse
 COPY src ./src
 COPY wsgi.py ./
 
-RUN pip install --no-cache-dir .
+RUN pip install --no-cache-dir --find-links=/app/wheelhouse .
 
 RUN mkdir -p /app/logs && chown -R app:app /app/logs
 
