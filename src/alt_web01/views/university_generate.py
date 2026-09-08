@@ -8,31 +8,21 @@ pattern as :mod:`alt_web01.views.student_import_large`.
 
 from __future__ import annotations
 
-from typing import Any, cast
+from typing import Any
 
 from flask import current_app, jsonify, render_template, request
 from flask.typing import ResponseReturnValue
 from sclog_lite import logger
 
 from alt_web01.celery_client import GET_UN_GROUPS_TASK, get_celery_app
-from alt_web01.university_store import UniversityStore
+from alt_web01.web_db import list_platform_universities
 from alt_web01.views import pages
-
 
 #: Maximum number of universities a single request may request from the LLM.
 MAX_UNIVERSITIES = 20
 
-#: Number of recently saved universities shown on the page.
+#: Number of recently collected universities shown on the page.
 RECENT_UNIVERSITIES_LIMIT = 20
-
-
-def _university_store() -> UniversityStore:
-    """Return the application university store.
-
-    Returns:
-        UniversityStore: The store registered on the Flask application.
-    """
-    return cast(UniversityStore, current_app.extensions["university_store"])
 
 
 @pages.get("/universities/generate")
@@ -40,10 +30,12 @@ def university_generate() -> str:
     """Render the automatic university and major group page.
 
     Returns:
-        str: Rendered page HTML including the most recently saved
-        universities for quick reference.
+        str: Rendered page HTML including the universities the platform has
+        already collected into ``web_db`` (newest first).
     """
-    recent = _university_store().list_universities()[:RECENT_UNIVERSITIES_LIMIT]
+    recent = list_platform_universities(
+        current_app.config, limit=RECENT_UNIVERSITIES_LIMIT
+    )
     return render_template(
         "university_generate.html",
         max_universities=MAX_UNIVERSITIES,

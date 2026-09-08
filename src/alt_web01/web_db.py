@@ -110,3 +110,74 @@ def list_recent_students(config: Mapping[str, object], limit: int = 1000) -> lis
         )
         for row in rows
     ]
+
+
+@dataclass(frozen=True)
+class PlatformUniversity:
+    """One university row from the platform's ``web_db.universities`` table."""
+
+    name: str
+    code: str
+    type: str
+    nature: str
+
+
+def list_platform_universities(
+    config: Mapping[str, object], limit: int = 20
+) -> list[PlatformUniversity]:
+    """Return the newest ``limit`` universities stored by the platform.
+
+    The ``get_un_groups`` task persists its output into the ``universities``
+    table of ``web_db``; this helper loads the most recently inserted rows so
+    the automatic-collection page can show what the platform already holds.
+
+    Args:
+        config: Flask configuration holding the ``MYSQL_WEB_*`` settings.
+        limit: Maximum number of rows to return (default 20).
+
+    Returns:
+        The newest universities ordered by primary key descending. Returns an
+        empty list when the table does not exist yet or the database is
+        unreachable, so the page degrades gracefully instead of failing.
+    """
+    try:
+        settings = _settings(config)
+    except WebDBUnavailableError:
+        return []
+
+    connection: pymysql.connections.Connection | None = None
+    try:
+        connection = pymysql.connect(
+            charset="utf8mb4",
+            cursorclass=DictCursor,
+            connect_timeout=5,
+            **settings,  # type: ignore[arg-type]
+        )
+        with connection.cursor() as cursor:
+            cursor.execute(
+                "SELECT name, code, type, nature "
+                "FROM universities ORDER BY id DESC LIMIT %s",
+                (limit,),
+            )
+            rows = cast(list[dict[str, object]], cursor.fetchall())
+    except pymysql.err.OperationalError:
+        # The web_db server may be temporarily unreachable.
+        return []
+    except pymysql.err.ProgrammingError as error:
+        if error.args and error.args[0] == _ER_NO_SUCH_TABLE:
+            # The collection task has not created the table yet.
+            return []
+        raise
+    finally:
+        if connection is not None:
+            connection.close()
+
+    return [
+        PlatformUniversity(
+            name=str(row["name"]),
+            code=str(row["code"]),
+            type=str(row["type"]),
+            nature=str(row["nature"]),
+        )
+        for row in rows
+    ]
