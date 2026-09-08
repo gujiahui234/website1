@@ -10,8 +10,9 @@ from __future__ import annotations
 
 from typing import Any, cast
 
-from flask import current_app, jsonify, render_template, request
+from flask import jsonify, render_template, request
 from flask.typing import ResponseReturnValue
+from sclog_lite import logger
 
 from alt_web01.celery_client import GET_UN_GROUPS_TASK, get_celery_app
 from alt_web01.university_store import UniversityStore
@@ -75,10 +76,10 @@ def university_generate_start() -> ResponseReturnValue:
             GET_UN_GROUPS_TASK, kwargs={"count": count}, retry=False
         )
     except Exception as error:  # noqa: BLE001 — broker failures surface as 503.
-        current_app.logger.opt(exception=error).error("高校自动采集任务投递失败")
+        logger.opt(exception=error).error("高校自动采集任务投递失败")
         return jsonify({"error": "任务平台暂不可用，请稍后重试。"}), 503
 
-    current_app.logger.bind(
+    logger.bind(
         component="university_generate", task_id=async_result.id, count=count
     ).info("高校自动采集任务已投递")
     return jsonify({"task_id": async_result.id})
@@ -101,7 +102,7 @@ def university_generate_result() -> ResponseReturnValue:
         async_result = get_celery_app().AsyncResult(task_id)
         state = async_result.state
     except Exception as error:  # noqa: BLE001 — backend outages surface as 503.
-        current_app.logger.opt(exception=error).error("查询高校采集任务状态失败")
+        logger.opt(exception=error).error("查询高校采集任务状态失败")
         return jsonify({"error": "任务平台暂不可用，请稍后重试。"}), 503
 
     payload: dict[str, Any] = {"state": state, "task_id": task_id}
@@ -111,7 +112,7 @@ def university_generate_result() -> ResponseReturnValue:
         try:
             result = async_result.result
         except Exception as error:  # noqa: BLE001 — result read failures as 503.
-            current_app.logger.opt(exception=error).error("读取高校采集任务结果失败")
+            logger.opt(exception=error).error("读取高校采集任务结果失败")
             return jsonify({"error": "任务平台暂不可用，请稍后重试。"}), 503
         if isinstance(result, dict):
             payload.update(
