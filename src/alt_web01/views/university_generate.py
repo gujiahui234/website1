@@ -10,11 +10,13 @@ from __future__ import annotations
 
 from typing import Any, cast
 
-from flask import ResponseReturnValue, current_app, jsonify, render_template, request
+from flask import current_app, jsonify, render_template, request
+from flask.typing import ResponseReturnValue
 
 from alt_web01.celery_client import GET_UN_GROUPS_TASK, get_celery_app
 from alt_web01.university_store import UniversityStore
 from alt_web01.views import pages
+
 
 #: Maximum number of universities a single request may request from the LLM.
 MAX_UNIVERSITIES = 20
