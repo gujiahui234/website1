@@ -1,7 +1,12 @@
 FROM python:3.13-slim
 
+# Tsinghua PyPI mirror: docker01's direct PyPI route is slow and flaky. The
+# pip cache mount keeps downloaded wheels across builds.
 ENV PYTHONDONTWRITEBYTECODE=1 \
-    PYTHONUNBUFFERED=1
+    PYTHONUNBUFFERED=1 \
+    PIP_DISABLE_PIP_VERSION_CHECK=1 \
+    PIP_DEFAULT_TIMEOUT=60 \
+    PIP_INDEX_URL=https://pypi.tuna.tsinghua.edu.cn/simple
 
 WORKDIR /app
 
@@ -16,7 +21,8 @@ COPY wheelhouse ./wheelhouse
 COPY src ./src
 COPY wsgi.py ./
 
-RUN pip install --no-cache-dir --find-links=/app/wheelhouse .
+RUN --mount=type=cache,target=/root/.cache/pip,sharing=locked \
+    pip install --find-links=/app/wheelhouse .
 
 RUN mkdir -p /app/logs && chown -R app:app /app/logs
 
