@@ -12,9 +12,12 @@
         通过 Celery 任务平台调用大模型自动采集高校与专业组信息并入库（按名称查重，重复的自动跳过）。
       </p>
     </div>
-    <div class="range-note" aria-label="单次采集数量上限">
-      <span>单次上限</span>
-      <strong>{{ max_universities }}</strong>
+    <div class="range-note" aria-label="平台已采集数据量">
+      <span>高校</span>
+      <strong id="stat-universities">{{ counts.universities }}</strong>
+      <span>所 · 专业组</span>
+      <strong id="stat-majors">{{ counts.major_groups }}</strong>
+      <span>个</span>
     </div>
   </header>
 
@@ -30,6 +33,16 @@
         <button class="button button-secondary" id="result-button" type="button" hidden>查看结果</button>
       </div>
     </form>
+  </div>
+
+  <div id="progress-area" class="student-card" hidden>
+    <p id="progress-label" class="storage-note">准备中…</p>
+    <div class="progress" style="height: 1.25rem;">
+      <div id="progress-bar"
+           class="progress-bar progress-bar-striped progress-bar-animated"
+           role="progressbar" aria-valuemin="0" aria-valuemax="100"
+           style="width: 5%;">5%</div>
+    </div>
   </div>
 
   <div id="status-area" aria-live="polite"></div>
@@ -80,7 +93,7 @@
   var generating = false;
   var pollTimer = null;
 
-  var POLL_INTERVAL_MS = 5000;
+  var POLL_INTERVAL_MS = 3000;
 
   function stopPolling() {
     if (pollTimer !== null) {
@@ -100,6 +113,26 @@
 
   function showNotice(text, kind) {
     return '<div class="notice notice-' + kind + '" role="status">' + text + "</div>";
+  }
+
+  var progressBar = document.getElementById("progress-bar");
+  var progressArea = document.getElementById("progress-area");
+  var progressLabel = document.getElementById("progress-label");
+
+  function setProgress(percent, label) {
+    progressArea.hidden = false;
+    progressBar.style.width = percent + "%";
+    progressBar.textContent = percent + "%";
+    progressLabel.textContent = label;
+  }
+
+  function hideProgress() {
+    progressArea.hidden = true;
+  }
+
+  function updateStats(universities, majors) {
+    document.getElementById("stat-universities").textContent = universities;
+    document.getElementById("stat-majors").textContent = majors;
   }
 
   function renderUniversitiesTable(universities) {
@@ -143,6 +176,10 @@
         if (data.state === "SUCCESS") {
           stopPolling();
           finishGeneration();
+          setProgress(100, "采集完成");
+          if (data.totals) {
+            updateStats(data.totals.universities, data.totals.major_groups);
+          }
           var summary =
             "<p>模型返回：<strong>" + (data.fetched || 0) + "</strong> 所 · " +
             "新增高校：<strong>" + (data.inserted_universities || 0) + "</strong> 所 · " +
@@ -153,6 +190,20 @@
             '<section class="saved-roster"><div class="roster-heading"><div>' +
             '<p class="page-kicker">本次采集结果</p><h2>新增高校</h2></div></div>' +
             summary + renderUniversitiesTable(data.universities) + "</section>";
+          return;
+        }
+        if (data.state === "PROGRESS") {
+          if (data.phase === "llm") {
+            setProgress(15, "正在调用大模型生成高校数据…");
+          } else {
+            var percent = data.percent || 0;
+            setProgress(
+              15 + Math.round(percent * 0.85),
+              "正在写入数据库 " + (data.processed || 0) + "/" + (data.total || 0) +
+                " · 已新增高校 " + (data.inserted_universities || 0) +
+                " 所、专业组 " + (data.inserted_major_groups || 0) + " 个"
+            );
+          }
           return;
         }
         resultArea.innerHTML = showNotice("正在采集中，请稍候…", "info");
@@ -182,11 +233,7 @@
     generateButton.disabled = true;
     resultButton.hidden = true;
     resultArea.innerHTML = "";
-    setStatus(
-      '<div class="notice notice-info" role="status">' +
-      '<span class="spinner-border spinner-border-sm" aria-hidden="true"></span> ' +
-      "任务已提交到 Celery 平台，正在采集中，请稍候…</div>"
-    );
+    setProgress(5, "任务提交中…");
 
     var body = new FormData();
     body.append("count", String(count));
@@ -207,6 +254,7 @@
       })
       .catch(function (error) {
         finishGeneration();
+        hideProgress();
         setStatus(showNotice(error.message, "error"));
       });
   });

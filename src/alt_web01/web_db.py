@@ -181,3 +181,48 @@ def list_platform_universities(
         )
         for row in rows
     ]
+
+
+def count_platform_data(config: Mapping[str, object]) -> dict[str, int]:
+    """Count the platform-collected rows in ``web_db``.
+
+    Args:
+        config: Flask configuration holding the ``MYSQL_WEB_*`` settings.
+
+    Returns:
+        Dictionary with ``universities`` and ``major_groups`` row counts.
+        Both keys are ``0`` when the tables do not exist yet or the database
+        is unreachable, so the page degrades gracefully instead of failing.
+    """
+    empty: dict[str, int] = {"universities": 0, "major_groups": 0}
+    try:
+        settings = _settings(config)
+    except WebDBUnavailableError:
+        return empty
+
+    connection: pymysql.connections.Connection | None = None
+    try:
+        connection = pymysql.connect(
+            charset="utf8mb4",
+            cursorclass=DictCursor,
+            connect_timeout=5,
+            **settings,  # type: ignore[arg-type]
+        )
+        with connection.cursor() as cursor:
+            cursor.execute("SELECT COUNT(*) AS n FROM universities")
+            universities = int(cast(dict[str, object], cursor.fetchone())["n"])
+            cursor.execute("SELECT COUNT(*) AS n FROM major_groups")
+            major_groups = int(cast(dict[str, object], cursor.fetchone())["n"])
+    except pymysql.err.OperationalError:
+        # The web_db server may be temporarily unreachable.
+        return empty
+    except pymysql.err.ProgrammingError as error:
+        if error.args and error.args[0] == _ER_NO_SUCH_TABLE:
+            # The collection task has not created the tables yet.
+            return empty
+        raise
+    finally:
+        if connection is not None:
+            connection.close()
+
+    return {"universities": universities, "major_groups": major_groups}

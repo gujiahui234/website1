@@ -15,7 +15,7 @@ from flask.typing import ResponseReturnValue
 from sclog_lite import logger
 
 from alt_web01.celery_client import GET_UN_GROUPS_TASK, get_celery_app
-from alt_web01.web_db import list_platform_universities
+from alt_web01.web_db import count_platform_data, list_platform_universities
 from alt_web01.views import pages
 
 #: Maximum number of universities a single request may request from the LLM.
@@ -31,15 +31,18 @@ def university_generate() -> str:
 
     Returns:
         str: Rendered page HTML including the universities the platform has
-        already collected into ``web_db`` (newest first).
+        already collected into ``web_db`` (newest first) and the totals of
+        the platform-collected data.
     """
     recent = list_platform_universities(
         current_app.config, limit=RECENT_UNIVERSITIES_LIMIT
     )
+    counts = count_platform_data(current_app.config)
     return render_template(
         "university_generate.html",
         max_universities=MAX_UNIVERSITIES,
         recent=recent,
+        counts=counts,
     )
 
 
@@ -98,6 +101,24 @@ def university_generate_result() -> ResponseReturnValue:
         return jsonify({"error": "任务平台暂不可用，请稍后重试。"}), 503
 
     payload: dict[str, Any] = {"state": state, "task_id": task_id}
+    if state == "PROGRESS":
+        meta = async_result.info
+        if isinstance(meta, dict):
+            processed = int(meta.get("processed", 0) or 0)
+            total = int(meta.get("total", 0) or 0) or 1
+            payload.update(
+                phase=str(meta.get("phase", "db")),
+                processed=processed,
+                total=total,
+                percent=round(processed / total * 100),
+                inserted_universities=int(
+                    meta.get("inserted_universities", 0) or 0
+                ),
+                inserted_major_groups=int(
+                    meta.get("inserted_major_groups", 0) or 0
+                ),
+            )
+        return jsonify(payload)
     if state == "FAILURE":
         payload["error"] = "高校采集任务执行失败，请查看任务平台日志。"
     elif state == "SUCCESS":
@@ -116,6 +137,7 @@ def university_generate_result() -> ResponseReturnValue:
                 skipped_universities=result.get("skipped_universities", 0),
                 skipped_major_groups=result.get("skipped_major_groups", 0),
                 universities=result.get("universities", []),
+                totals=count_platform_data(current_app.config),
             )
             if not result.get("ok", False):
                 payload["error"] = result.get("error", "采集任务执行失败。")
