@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from typing import Any, cast
 
-from flask import jsonify, render_template, request
+from flask import current_app, jsonify, render_template, request
 from flask.typing import ResponseReturnValue
 from sclog_lite import logger
 
