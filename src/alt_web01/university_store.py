@@ -137,34 +137,6 @@ class MySQLUniversityStore:
             connect_timeout=5,
         )
 
-    def ensure_schema(self) -> None:
-        """Create the university table and uniqueness constraints."""
-        connection = self._connect()
-        try:
-            with connection.cursor() as cursor:
-                cursor.execute(
-                    """
-                    CREATE TABLE IF NOT EXISTS universities (
-                        id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
-                        name VARCHAR(100) NOT NULL,
-                        code CHAR(5) NOT NULL,
-                        university_type ENUM('民办', '公办') NOT NULL,
-                        nature ENUM('985', '211', '一本', '其他') NOT NULL,
-                        created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-                        PRIMARY KEY (id),
-                        UNIQUE KEY uq_universities_name (name),
-                        UNIQUE KEY uq_universities_code (code)
-                    ) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci
-                    """
-                )
-                cursor.execute(
-                    "ALTER TABLE universities "
-                    "MODIFY COLUMN code CHAR(5) NOT NULL"
-                )
-            connection.commit()
-        finally:
-            connection.close()
-
     def list_universities(self) -> list[SavedUniversity]:
         """Load all saved universities from MySQL, newest first."""
         connection = self._connect()

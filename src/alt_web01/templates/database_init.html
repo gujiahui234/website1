@@ -1,0 +1,205 @@
+{% extends "base.html" %}
+
+{% block title %}数据库初始化 · alt_web01{% endblock %}
+
+{% block content %}
+<section class="student-workspace" aria-labelledby="page-title">
+  <header class="student-heading">
+    <div>
+      <p class="page-kicker">系统设置 · 数据库</p>
+      <h1 id="page-title">数据库初始化</h1>
+      <p class="student-intro">
+        通过 Celery 任务平台重建业务数据库（web_db / log_db）及其账号，并创建全部业务表。
+      </p>
+    </div>
+  </header>
+
+  <div class="student-card">
+    <div class="alert alert-warning" role="alert">
+      <strong>危险操作！</strong>初始化将
+      <u>删除并重建</u> web_db 与 log_db 两个数据库及
+      web_user / log_user 两个账号，库中全部现有数据将<strong>永久丢失</strong>。
+    </div>
+    <div class="form-actions">
+      <button class="button button-danger" id="init-button" type="button"
+              data-bs-toggle="modal" data-bs-target="#confirm-modal">启动初始化</button>
+    </div>
+  </div>
+
+  <div id="progress-area" class="student-card" hidden>
+    <p id="progress-label" class="storage-note">任务提交中…</p>
+    <div class="progress" style="height: 1.25rem;">
+      <div id="progress-bar"
+           class="progress-bar progress-bar-striped progress-bar-animated"
+           role="progressbar" aria-valuemin="0" aria-valuemax="100"
+           style="width: 10%;">10%</div>
+    </div>
+  </div>
+
+  <div id="status-area" aria-live="polite"></div>
+  <div id="result-area" aria-live="polite"></div>
+</section>
+
+<!-- 危险操作确认框 -->
+<div class="modal fade" id="confirm-modal" tabindex="-1"
+     aria-labelledby="confirm-modal-title" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="confirm-modal-title">警告：数据库将被清空重建</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"
+                aria-label="关闭"></button>
+      </div>
+      <div class="modal-body">
+        <p>此操作将<strong>删除</strong>以下数据库及其全部数据，然后从零重建：</p>
+        <ul>
+          <li>业务库 <code>web_db</code> 与账号 <code>web_user</code></li>
+          <li>日志库 <code>log_db</code> 与账号 <code>log_user</code></li>
+        </ul>
+        <p class="text-danger">该操作不可撤销！确定要继续吗？</p>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+        <button type="button" class="btn btn-danger" id="confirm-init-button">确认初始化</button>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+(function () {
+  "use strict";
+
+  var initButton = document.getElementById("init-button");
+  var confirmButton = document.getElementById("confirm-init-button");
+  var statusArea = document.getElementById("status-area");
+  var resultArea = document.getElementById("result-area");
+  var progressArea = document.getElementById("progress-area");
+  var progressBar = document.getElementById("progress-bar");
+  var progressLabel = document.getElementById("progress-label");
+
+  var taskId = null;
+  var running = false;
+  var pollTimer = null;
+
+  var POLL_INTERVAL_MS = 3000;
+
+  function stopPolling() {
+    if (pollTimer !== null) {
+      window.clearInterval(pollTimer);
+      pollTimer = null;
+    }
+  }
+
+  function startPolling() {
+    stopPolling();
+    pollTimer = window.setInterval(function () { fetchResult(); }, POLL_INTERVAL_MS);
+  }
+
+  function setStatus(html) {
+    statusArea.innerHTML = html;
+  }
+
+  function showNotice(text, kind) {
+    return '<div class="notice notice-' + kind + '" role="status">' + text + "</div>";
+  }
+
+  function setProgress(percent, label) {
+    progressArea.hidden = false;
+    progressBar.style.width = percent + "%";
+    progressBar.textContent = percent + "%";
+    progressLabel.textContent = label;
+  }
+
+  function finishRun() {
+    running = false;
+    initButton.disabled = false;
+  }
+
+  function renderResult(data) {
+    var rows = [
+      "<tr><th>重建的数据库</th><td>" + (data.created_databases || []).join("、") + "</td></tr>",
+      "<tr><th>重建的账号</th><td>" + (data.created_users || []).join("、") + "</td></tr>",
+      "<tr><th>创建的业务表</th><td>" + (data.tables || []).join("、") + "</td></tr>",
+      "<tr><th>enrollment_status 迁移</th><td>" +
+        (data.enrollment_status_added ? "已原地新增" : "无需迁移") + "</td></tr>",
+      "<tr><th>完成时间</th><td>" + (data.finished_at || "—") + "</td></tr>"
+    ].join("");
+    resultArea.innerHTML = showNotice("数据库初始化已完成", "success") +
+      '<section class="saved-roster"><div class="roster-heading"><div>' +
+      '<p class="page-kicker">执行结果</p><h2>初始化详情</h2></div></div>' +
+      '<div class="table-wrap"><table class="student-data-table">' +
+      "<tbody>" + rows + "</tbody></table></div></section>";
+  }
+
+  function fetchResult() {
+    if (!taskId) { return; }
+    fetch("/settings/database-init/result?task_id=" + encodeURIComponent(taskId))
+      .then(function (response) { return response.json(); })
+      .then(function (data) {
+        if (data.error) {
+          stopPolling();
+          finishRun();
+          resultArea.innerHTML = showNotice(data.error, "error");
+          return;
+        }
+        if (data.state === "SUCCESS") {
+          stopPolling();
+          finishRun();
+          setProgress(100, "初始化完成");
+          renderResult(data);
+          return;
+        }
+        if (data.state === "FAILURE") {
+          stopPolling();
+          finishRun();
+          resultArea.innerHTML = showNotice(data.error || "初始化失败", "error");
+          return;
+        }
+        setProgress(50, "正在重建数据库与业务表，请稍候…");
+      })
+      .catch(function () {
+        resultArea.innerHTML = showNotice("查询结果失败，稍后自动重试。", "error");
+      })
+      .finally(function () {
+        if (pollTimer === null && running) {
+          startPolling();
+        }
+      });
+  }
+
+  confirmButton.addEventListener("click", function () {
+    if (running) { return; }
+    // 关闭确认框（base.html 已加载 Bootstrap 5 bundle）。
+    var modalElement = document.getElementById("confirm-modal");
+    if (window.bootstrap) {
+      window.bootstrap.Modal.getOrCreateInstance(modalElement).hide();
+    }
+
+    running = true;
+    initButton.disabled = true;
+    resultArea.innerHTML = "";
+    setProgress(10, "任务提交中…");
+
+    fetch("{{ url_for('pages.database_init_start') }}", { method: "POST" })
+      .then(function (response) {
+        return response.json().then(function (data) {
+          if (!response.ok) { throw new Error(data.error || "任务投递失败。"); }
+          return data;
+        });
+      })
+      .then(function (data) {
+        taskId = data.task_id;
+        startPolling();
+      })
+      .catch(function (error) {
+        finishRun();
+        progressArea.hidden = true;
+        setStatus(showNotice(error.message, "error"));
+      });
+  });
+})();
+</script>
+{% endblock %}

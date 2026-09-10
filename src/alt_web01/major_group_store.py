@@ -169,38 +169,6 @@ class MySQLMajorGroupStore:
             connect_timeout=5,
         )
 
-    def ensure_schema(self) -> None:
-        """Create the major group table and university-scoped constraints."""
-        connection = self._connect()
-        try:
-            with connection.cursor() as cursor:
-                cursor.execute(
-                    """
-                    CREATE TABLE IF NOT EXISTS major_groups (
-                        id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
-                        university_id BIGINT UNSIGNED NOT NULL,
-                        name VARCHAR(100) NOT NULL,
-                        code VARCHAR(5) NOT NULL,
-                        created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-                        PRIMARY KEY (id),
-                        UNIQUE KEY uq_major_groups_university_name
-                            (university_id, name),
-                        UNIQUE KEY uq_major_groups_university_code
-                            (university_id, code),
-                        CONSTRAINT fk_major_groups_university
-                            FOREIGN KEY (university_id) REFERENCES universities (id)
-                            ON DELETE CASCADE
-                    ) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci
-                    """
-                )
-                cursor.execute(
-                    "ALTER TABLE major_groups "
-                    "MODIFY COLUMN code VARCHAR(5) NOT NULL"
-                )
-            connection.commit()
-        finally:
-            connection.close()
-
     def list_major_groups(
         self, *, university_number: int
     ) -> list[SavedMajorGroup]:

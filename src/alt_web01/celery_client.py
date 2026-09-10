@@ -22,6 +22,10 @@ GENERATE_MANY_STUDENTS_TASK = "tasks.db.generate_many_students"
 #: (SiliconFlow LLM powered, see ``app/tasks/ai_tasks.py`` of alt_celery3).
 GET_UN_GROUPS_TASK = "tasks.ai.get_un_groups"
 
+#: Canonical name of the destructive database initialisation task
+#: (see ``app/tasks/init_db_tasks.py`` of alt_celery3).
+INIT_WEB_DB_TASK = "tasks.db.init_web_db"
+
 #: Hard upper bound of students a single request may generate (1 亿).
 MAX_STUDENTS = 100_000_000
 

@@ -127,27 +127,6 @@ class MySQLStudentStore:
             connect_timeout=5,
         )
 
-    def ensure_schema(self) -> None:
-        """Create the student table if it does not exist."""
-        connection = self._connect()
-        try:
-            with connection.cursor() as cursor:
-                cursor.execute(
-                    """
-                    CREATE TABLE IF NOT EXISTS students (
-                        id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
-                        name VARCHAR(40) NOT NULL,
-                        birthday DATE NOT NULL,
-                        gender ENUM('男', '女') NOT NULL,
-                        created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-                        PRIMARY KEY (id)
-                    ) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci
-                    """
-                )
-            connection.commit()
-        finally:
-            connection.close()
-
     def list_students(self) -> list[SavedStudent]:
         """Load the 1,000 most recently saved students from MySQL."""
         connection = self._connect()

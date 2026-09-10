@@ -56,6 +56,12 @@
               <li><a class="dropdown-item" href="{{ url_for('pages.analytics_students_by_university') }}">各大学学生数量统计</a></li>
             </ul>
           </li>
+          <li class="nav-item dropdown">
+            <a class="nav-link dropdown-toggle{{ ' active' if request.endpoint in ['pages.database_init'] }}" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">系统设置</a>
+            <ul class="dropdown-menu dropdown-menu-end">
+              <li><a class="dropdown-item" href="{{ url_for('pages.database_init') }}">数据库初始化</a></li>
+            </ul>
+          </li>
         </ul>
       </div>
     </div>

@@ -11,6 +11,7 @@ pages = Blueprint("pages", __name__)
 from alt_web01.views import (  # noqa: E402, F401
     analytics_students_by_university,
     analytics_students_by_year,
+    database_init,
     enrollment_automatic,
     enrollment_manual,
     home,

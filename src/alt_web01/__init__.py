@@ -113,13 +113,12 @@ def create_app(test_config: dict[str, object] | None = None) -> Flask:
     university_store: UniversityStore
     major_group_store: MajorGroupStore
     if store_mode == "mysql":
+        # Tables are created by the Celery platform's ``init_web_db`` task
+        # (系统设置 → 数据库初始化); this app no longer runs any DDL itself.
         settings = MySQLSettings.from_config(app.config)
         student_store = MySQLStudentStore(settings)
         university_store = MySQLUniversityStore(settings)
         major_group_store = MySQLMajorGroupStore(settings)
-        student_store.ensure_schema()
-        university_store.ensure_schema()
-        major_group_store.ensure_schema()
     elif store_mode == "memory":
         student_store = MemoryStudentStore()
         university_store = MemoryUniversityStore()
