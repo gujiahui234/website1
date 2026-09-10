@@ -100,6 +100,10 @@ def create_app(test_config: dict[str, object] | None = None) -> Flask:
         MYSQL_WEB_DATABASE=os.getenv("MYSQL_WEB_DATABASE", "web_db"),
         MYSQL_WEB_USER=os.getenv("MYSQL_WEB_USER", ""),
         MYSQL_WEB_PASSWORD=os.getenv("MYSQL_WEB_PASSWORD", ""),
+        # 学生 API 服务器（poc4-students-api）调试与文档地址。
+        API_SERVER_DOCS=os.getenv("API_SERVER_DOCS", ""),
+        API_SERVER_REDOC=os.getenv("API_SERVER_REDOC", ""),
+        API_SERVER_JSON=os.getenv("API_SERVER_JSON", ""),
     )
     if test_config is not None:
         app.config.update(test_config)

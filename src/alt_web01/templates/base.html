@@ -26,11 +26,12 @@
             <a class="nav-link{{ ' active' if request.endpoint == 'pages.home' }}" href="{{ url_for('pages.home') }}">首页</a>
           </li>
           <li class="nav-item dropdown">
-            <a class="nav-link dropdown-toggle{{ ' active' if request.endpoint in ['pages.student_add', 'pages.student_import_small', 'pages.student_import_large'] }}" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">学生</a>
+            <a class="nav-link dropdown-toggle{{ ' active' if request.endpoint in ['pages.student_add', 'pages.student_import_small', 'pages.student_import_large', 'pages.student_maintain'] }}" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">学生</a>
             <ul class="dropdown-menu dropdown-menu-end">
               <li><a class="dropdown-item" href="{{ url_for('pages.student_add') }}">手工添加学生</a></li>
               <li><a class="dropdown-item" href="{{ url_for('pages.student_import_small') }}">批量添加学生（小数据量）</a></li>
               <li><a class="dropdown-item" href="{{ url_for('pages.student_import_large') }}">批量添加学生（大数据量）</a></li>
+              <li><a class="dropdown-item" href="{{ url_for('pages.student_maintain') }}">手工维护学生信息</a></li>
             </ul>
           </li>
           <li class="nav-item dropdown">

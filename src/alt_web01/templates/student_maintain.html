@@ -1,0 +1,285 @@
+{% extends "base.html" %}
+
+{% block title %}手工维护学生信息 · alt_web01{% endblock %}
+
+{% block content %}
+<section class="student-workspace" aria-labelledby="page-title">
+  <header class="student-heading">
+    <div>
+      <p class="page-kicker">学生 · 数据维护</p>
+      <h1 id="page-title">手工维护学生信息</h1>
+      <p class="student-intro">
+        搜索平台学生库中的学生记录，点击记录后可修改姓名、性别、出生日期，或删除该记录。
+        数据通过学生 API 服务器读写，接口文档见
+        <a href="{{ api_docs_url }}" target="_blank" rel="noopener">Swagger UI</a> /
+        <a href="{{ api_redoc_url }}" target="_blank" rel="noopener">ReDoc</a>。
+      </p>
+    </div>
+    <div class="range-note" aria-label="单次搜索返回上限">
+      <span>返回上限</span>
+      <strong>{{ "{:,}".format(max_results) }} 条</strong>
+    </div>
+  </header>
+
+  <div class="student-card">
+    <form id="search-form" class="student-form" aria-label="学生搜索">
+      <div class="form-field">
+        <label for="search-name">学生姓名（模糊匹配）</label>
+        <input id="search-name" name="name" type="text" placeholder="例如：杨澄壑">
+      </div>
+      <div class="form-field">
+        <label for="search-gender">性别（M/F）</label>
+        <select id="search-gender" name="gender">
+          <option value="">全部</option>
+          <option value="M">M（男）</option>
+          <option value="F">F（女）</option>
+        </select>
+      </div>
+      <div class="form-actions">
+        <button class="button button-primary" type="submit">搜索学生</button>
+      </div>
+    </form>
+
+    <form id="id-form" class="student-form" aria-label="按 ID 查询">
+      <div class="form-field">
+        <label for="search-id">学生 ID（记录主键）</label>
+        <input id="search-id" name="student_id" type="number" min="1" step="1" placeholder="例如：1">
+      </div>
+      <div class="form-actions">
+        <button class="button button-secondary" type="submit">按 ID 查询</button>
+      </div>
+    </form>
+  </div>
+
+  <div id="feedback-area" aria-live="polite"></div>
+  <div id="result-area" aria-live="polite"></div>
+</section>
+
+<div class="modal fade" id="edit-modal" tabindex="-1" aria-labelledby="edit-modal-title" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="edit-modal-title">编辑学生信息</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="关闭"></button>
+      </div>
+      <div class="modal-body">
+        <form id="edit-form">
+          <div class="form-field">
+            <label for="edit-id">学生 ID（学号记录主键）</label>
+            <input id="edit-id" type="text" readonly>
+          </div>
+          <div class="form-field">
+            <label for="edit-number">学号（number，只读）</label>
+            <input id="edit-number" type="text" readonly>
+          </div>
+          <div class="form-field">
+            <label for="edit-name">姓名</label>
+            <input id="edit-name" type="text" maxlength="64" required>
+          </div>
+          <div class="form-field">
+            <label for="edit-gender">性别</label>
+            <select id="edit-gender">
+              <option value="M">M（男）</option>
+              <option value="F">F（女）</option>
+            </select>
+          </div>
+          <div class="form-field">
+            <label for="edit-birthday">出生日期</label>
+            <input id="edit-birthday" type="date" required>
+          </div>
+        </form>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="button button-secondary" id="delete-button">删除该学生</button>
+        <button type="button" class="button button-secondary" data-bs-dismiss="modal">取消</button>
+        <button type="button" class="button button-primary" id="save-button">保存修改</button>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+(function () {
+  "use strict";
+
+  var MAX_RESULTS = {{ max_results }};
+  var GENDER_FROM_API = { "男": "M", "女": "F" };
+
+  var searchForm = document.getElementById("search-form");
+  var idForm = document.getElementById("id-form");
+  var feedbackArea = document.getElementById("feedback-area");
+  var resultArea = document.getElementById("result-area");
+
+  var editModal = new bootstrap.Modal(document.getElementById("edit-modal"));
+  var saveButton = document.getElementById("save-button");
+  var deleteButton = document.getElementById("delete-button");
+  var currentStudents = [];
+
+  function showNotice(text, kind) {
+    feedbackArea.innerHTML =
+      '<div class="notice notice-' + kind + '" role="status">' + text + "</div>";
+  }
+
+  function escapeHtml(value) {
+    return String(value == null ? "" : value)
+      .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+  }
+
+  function renderStudents(students, total) {
+    if (!students || students.length === 0) {
+      resultArea.innerHTML = '<p class="storage-note">没有找到匹配的学生记录。</p>';
+      return;
+    }
+    var rows = students.map(function (student) {
+      return '<tr data-id="' + student.id + '" style="cursor:pointer" ' +
+        'title="点击编辑该学生">' +
+        "<td>" + student.id + "</td>" +
+        "<td>" + escapeHtml(student.number) + "</td>" +
+        "<td>" + escapeHtml(student.name) + "</td>" +
+        "<td>" + escapeHtml(student.gender) + "</td>" +
+        "<td>" + escapeHtml(student.birthday) + "</td>" +
+        "</tr>";
+    }).join("");
+    resultArea.innerHTML =
+      '<section class="saved-roster"><div class="roster-heading"><div>' +
+      '<p class="page-kicker">搜索结果</p><h2>学生列表</h2></div>' +
+      '<span class="roster-count">命中 ' + Number(total).toLocaleString("zh-CN") +
+      " 条，显示 " + students.length + " 条</span></div>" +
+      '<div class="table-wrap"><table class="student-data-table">' +
+      "<thead><tr><th>ID</th><th>学号</th><th>姓名</th><th>性别</th><th>出生日期</th></tr></thead>" +
+      "<tbody>" + rows + "</tbody></table></div></section>";
+
+    resultArea.querySelectorAll("tr[data-id]").forEach(function (row) {
+      row.addEventListener("click", function () {
+        openEditModal(Number(row.getAttribute("data-id")));
+      });
+    });
+  }
+
+  function fetchJson(url, options) {
+    return fetch(url, options).then(function (response) {
+      return response.json().then(function (data) {
+        if (!response.ok) {
+          throw new Error(data.error || "请求失败（HTTP " + response.status + "）。");
+        }
+        return data;
+      });
+    });
+  }
+
+  function doSearch() {
+    var params = new URLSearchParams();
+    var name = searchForm.elements["name"].value.trim();
+    var gender = searchForm.elements["gender"].value;
+    if (name) { params.append("name", name); }
+    if (gender) { params.append("gender", gender); }
+    params.append("limit", MAX_RESULTS);
+    showNotice('<span class="spinner-border spinner-border-sm" aria-hidden="true"></span> 正在查询…', "info");
+    fetchJson("{{ url_for('pages.student_maintain_search') }}?" + params.toString())
+      .then(function (data) {
+        currentStudents = data.items || [];
+        renderStudents(currentStudents, data.total || 0);
+        feedbackArea.innerHTML = "";
+      })
+      .catch(function (error) { showNotice(error.message, "error"); });
+  }
+
+  function doSearchById() {
+    var value = idForm.elements["student_id"].value.trim();
+    if (!value || Number(value) < 1) {
+      showNotice("请输入有效的学生 ID。", "error");
+      return;
+    }
+    showNotice('<span class="spinner-border spinner-border-sm" aria-hidden="true"></span> 正在查询…', "info");
+    fetchJson("{{ url_for('pages.student_maintain_get', student_id=0) }}".replace("/0", "/" + Number(value)))
+      .then(function (student) {
+        currentStudents = [student];
+        renderStudents(currentStudents, 1);
+        feedbackArea.innerHTML = "";
+      })
+      .catch(function (error) { showNotice(error.message, "error"); });
+  }
+
+  function findStudent(studentId) {
+    return currentStudents.find(function (student) {
+      return Number(student.id) === studentId;
+    });
+  }
+
+  function openEditModal(studentId) {
+    var student = findStudent(studentId);
+    if (!student) { return; }
+    document.getElementById("edit-id").value = student.id;
+    document.getElementById("edit-number").value = student.number;
+    document.getElementById("edit-name").value = student.name;
+    document.getElementById("edit-gender").value =
+      GENDER_FROM_API[student.gender] || "M";
+    document.getElementById("edit-birthday").value = student.birthday;
+    editModal.show();
+  }
+
+  saveButton.addEventListener("click", function () {
+    var studentId = Number(document.getElementById("edit-id").value);
+    var payload = {
+      name: document.getElementById("edit-name").value.trim(),
+      gender: document.getElementById("edit-gender").value,
+      birthday: document.getElementById("edit-birthday").value,
+    };
+    if (!payload.name) { showNotice("姓名不能为空。", "error"); return; }
+    if (!payload.birthday) { showNotice("请选择出生日期。", "error"); return; }
+    saveButton.disabled = true;
+    fetchJson("{{ url_for('pages.student_maintain_update', student_id=0) }}".replace("/0", "/" + studentId), {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    })
+      .then(function (updated) {
+        editModal.hide();
+        showNotice("学生信息已保存。", "success");
+        var index = currentStudents.findIndex(function (student) {
+          return Number(student.id) === studentId;
+        });
+        if (index >= 0) { currentStudents[index] = updated; }
+        renderStudents(currentStudents, currentStudents.length);
+      })
+      .catch(function (error) { showNotice(error.message, "error"); })
+      .finally(function () { saveButton.disabled = false; });
+  });
+
+  deleteButton.addEventListener("click", function () {
+    var studentId = Number(document.getElementById("edit-id").value);
+    var studentName = document.getElementById("edit-name").value;
+    if (!window.confirm(
+      "警告：此操作将永久删除学生「" + studentName + "」（ID=" + studentId + "），且不可恢复！\n确定要删除吗？"
+    )) { return; }
+    deleteButton.disabled = true;
+    fetchJson("{{ url_for('pages.student_maintain_delete', student_id=0) }}".replace("/0", "/" + studentId), {
+      method: "DELETE",
+    })
+      .then(function () {
+        editModal.hide();
+        showNotice("学生已删除。", "success");
+        currentStudents = currentStudents.filter(function (student) {
+          return Number(student.id) !== studentId;
+        });
+        renderStudents(currentStudents, currentStudents.length);
+      })
+      .catch(function (error) { showNotice(error.message, "error"); })
+      .finally(function () { deleteButton.disabled = false; });
+  });
+
+  searchForm.addEventListener("submit", function (event) {
+    event.preventDefault();
+    doSearch();
+  });
+
+  idForm.addEventListener("submit", function (event) {
+    event.preventDefault();
+    doSearchById();
+  });
+})();
+</script>
+{% endblock %}

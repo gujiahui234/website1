@@ -19,6 +19,10 @@ services:
       MYSQL_WEB_DATABASE: "${MYSQL_WEB_DATABASE:-web_db}"
       MYSQL_WEB_USER: "${MYSQL_WEB_USER:-web_user}"
       MYSQL_WEB_PASSWORD: "${MYSQL_WEB_PASSWORD:?MYSQL_WEB_PASSWORD must be set in .env}"
+      # 学生 API 服务器（poc4-students-api）调试与文档地址
+      API_SERVER_DOCS: "${API_SERVER_DOCS:-http://192.168.220.134:8001/docs}"
+      API_SERVER_REDOC: "${API_SERVER_REDOC:-http://192.168.220.134:8001/redoc}"
+      API_SERVER_JSON: "${API_SERVER_JSON:-http://192.168.220.134:8001/openapi.json}"
     networks:
       - default
       - app-network

@@ -21,6 +21,7 @@ dependencies = [
     "PyMySQL>=1.1,<2",
     "celery[redis]>=5.6,<6",
     "python-dotenv>=1.1,<2",
+    "httpx>=0.27",
     # Plain version constraints (no git+https direct URLs): these packages
     # ship as pre-built wheels in wheelhouse/ (see Dockerfile) because some
     # build hosts cannot reach github.com.

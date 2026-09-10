@@ -18,6 +18,7 @@ from alt_web01.views import (  # noqa: E402, F401
     student_add,
     student_import_large,
     student_import_small,
+    student_maintain,
     university_add,
     university_generate,
 )
