@@ -22,9 +22,10 @@ from alt_web01.views import pages
 #: Hard upper bound of rows returned by one search (business requirement).
 MAX_SEARCH_RESULTS = 1000
 
-#: UI gender codes (M/F) mapped to the values stored in ``web_db.students``.
-GENDER_TO_API = {"M": "男", "F": "女"}
-GENDER_FROM_API = {"男": "M", "女": "F"}
+#: UI gender codes (M/F) mapped to the values stored in ``web_db.students``
+#: (the rebuilt schema stores the single-letter code directly).
+GENDER_TO_API = {"M": "M", "F": "F"}
+GENDER_FROM_API = {"M": "M", "F": "F"}
 
 #: Allowed request query parameter for gender filtering.
 ALLOWED_GENDER_CODES = {"M", "F", ""}
