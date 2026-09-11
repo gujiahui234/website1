@@ -15,9 +15,10 @@ from typing import Mapping, cast
 import pymysql  # type: ignore[import-untyped]
 from pymysql.cursors import DictCursor  # type: ignore[import-untyped]
 
-#: Error number raised by MySQL when the ``students`` table does not exist
-#: yet (i.e. the platform task has never run against this database).
-_ER_NO_SUCH_TABLE = 1146
+#: MySQL error numbers that degrade into an empty result instead of failing
+#: the page: the table does not exist yet (1146, the platform task has never
+#: run) or a column is missing (1054, schema changed under us).
+_BENIGN_ERRORS = {1146, 1054}
 
 
 @dataclass(frozen=True)
@@ -84,7 +85,7 @@ def list_recent_students(config: Mapping[str, object], limit: int = 1000) -> lis
         )
         with connection.cursor() as cursor:
             cursor.execute(
-                "SELECT number, name, gender, birthday "
+                "SELECT id, name, gender, birthday "
                 "FROM students ORDER BY id DESC LIMIT %s",
                 (limit,),
             )
@@ -93,7 +94,7 @@ def list_recent_students(config: Mapping[str, object], limit: int = 1000) -> lis
         # The web_db server may be temporarily unreachable.
         return []
     except pymysql.err.ProgrammingError as error:
-        if error.args and error.args[0] == _ER_NO_SUCH_TABLE:
+        if error.args and error.args[0] in _BENIGN_ERRORS:
             # The generation task has not created the table yet.
             return []
         raise
@@ -103,7 +104,7 @@ def list_recent_students(config: Mapping[str, object], limit: int = 1000) -> lis
 
     return [
         GeneratedStudent(
-            number=cast(int, row["number"]),
+            number=cast(int, row["id"]),
             name=str(row["name"]),
             gender=str(row["gender"]),
             birthday=cast(dt.date, row["birthday"]),
