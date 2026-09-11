@@ -165,7 +165,7 @@ def list_platform_universities(
         # The web_db server may be temporarily unreachable.
         return []
     except pymysql.err.ProgrammingError as error:
-        if error.args and error.args[0] == _ER_NO_SUCH_TABLE:
+        if error.args and error.args[0] in _BENIGN_ERRORS:
             # The collection task has not created the table yet.
             return []
         raise
@@ -211,14 +211,14 @@ def count_platform_data(config: Mapping[str, object]) -> dict[str, int]:
         )
         with connection.cursor() as cursor:
             cursor.execute("SELECT COUNT(*) AS n FROM universities")
-            universities = int(cast(dict[str, object], cursor.fetchone())["n"])
+            universities = int(cast("int", cursor.fetchone()["n"]))  # type: ignore[union-attr]
             cursor.execute("SELECT COUNT(*) AS n FROM major_groups")
-            major_groups = int(cast(dict[str, object], cursor.fetchone())["n"])
+            major_groups = int(cast("int", cursor.fetchone()["n"]))  # type: ignore[union-attr]
     except pymysql.err.OperationalError:
         # The web_db server may be temporarily unreachable.
         return empty
     except pymysql.err.ProgrammingError as error:
-        if error.args and error.args[0] == _ER_NO_SUCH_TABLE:
+        if error.args and error.args[0] in _BENIGN_ERRORS:
             # The collection task has not created the tables yet.
             return empty
         raise
