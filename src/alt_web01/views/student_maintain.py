@@ -48,7 +48,7 @@ def _gender_to_api(code: str) -> str | None:
     return GENDER_TO_API.get(code)
 
 
-def _api_error_response(exc: api_client.APIClientError) -> Response:
+def _api_error_response(exc: api_client.APIClientError) -> ResponseReturnValue:
     """Convert an :class:`APIClientError` into a JSON error response.
 
     Args:
