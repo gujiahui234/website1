@@ -7,6 +7,7 @@ import os
 from pathlib import Path
 from time import perf_counter
 
+from dotenv import load_dotenv
 from flask import Flask, Response, g, request
 from sclog_lite import logger, setup_logger, shutdown
 from werkzeug.exceptions import HTTPException
@@ -27,6 +28,22 @@ from alt_web01.university_store import (
     MySQLUniversityStore,
     UniversityStore,
 )
+
+
+def _load_environment() -> None:
+    """Load the project ``.env`` file into ``os.environ`` (once per process).
+
+    Lookup order: the current working directory first (development /
+    ``flask run``), then the repository root derived from this file's
+    location. Existing environment variables always win (``override=False``),
+    so container-provided configuration is never clobbered.
+    """
+    project_root = Path(__file__).resolve().parents[2]
+    for candidate in (Path.cwd() / ".env", project_root / ".env"):
+        if candidate.is_file():
+            load_dotenv(candidate, override=False)
+            return
+
 
 _logging_configured = False
 
@@ -85,6 +102,7 @@ def create_app(test_config: dict[str, object] | None = None) -> Flask:
     Returns:
         Flask: A configured Flask application instance.
     """
+    _load_environment()
     _configure_logging()
     app = Flask(__name__)
     app.config.from_mapping(
