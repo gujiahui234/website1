@@ -23,6 +23,8 @@ services:
       API_SERVER_DOCS: "${API_SERVER_DOCS:-http://192.168.220.134:8001/docs}"
       API_SERVER_REDOC: "${API_SERVER_REDOC:-http://192.168.220.134:8001/redoc}"
       API_SERVER_JSON: "${API_SERVER_JSON:-http://192.168.220.134:8001/openapi.json}"
+      # Celery 任务平台 API 服务器（alt_celery3，run_api.py）
+      API_SERVER_TASKS: "${API_SERVER_TASKS:-http://192.168.220.134:8001/api/tasks}"
     networks:
       - default
       - app-network
