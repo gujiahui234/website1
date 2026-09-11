@@ -48,6 +48,87 @@ class RouteContractTests(unittest.TestCase):
                 "pages.analytics_students_by_university",
                 "/analytics/students-by-university",
             ),
+            ("pages.simulation_ncee", "/simulations/ncee"),
+            ("pages.simulation_admission", "/simulations/admission"),
+            ("pages.simulation_exam", "/simulations/exam"),
+            ("pages.simulation_graduate", "/simulations/graduate"),
+            (
+                "pages.simulation_ncee_eligible",
+                "/simulations/ncee/api/eligible",
+            ),
+            (
+                "pages.simulation_ncee_dispatch",
+                "/simulations/ncee/api/dispatch",
+            ),
+            (
+                "pages.simulation_ncee_result",
+                "/simulations/ncee/api/result/<task_id>",
+            ),
+            (
+                "pages.simulation_admission_eligible",
+                "/simulations/admission/api/eligible",
+            ),
+            (
+                "pages.simulation_admission_dispatch",
+                "/simulations/admission/api/dispatch",
+            ),
+            (
+                "pages.simulation_admission_result",
+                "/simulations/admission/api/result/<task_id>",
+            ),
+            (
+                "pages.simulation_exam_eligible",
+                "/simulations/exam/api/eligible",
+            ),
+            (
+                "pages.simulation_exam_dispatch",
+                "/simulations/exam/api/dispatch",
+            ),
+            (
+                "pages.simulation_exam_result",
+                "/simulations/exam/api/result/<task_id>",
+            ),
+            (
+                "pages.simulation_graduate_eligible",
+                "/simulations/graduate/api/eligible",
+            ),
+            (
+                "pages.simulation_graduate_dispatch",
+                "/simulations/graduate/api/dispatch",
+            ),
+            (
+                "pages.simulation_graduate_result",
+                "/simulations/graduate/api/result/<task_id>",
+            ),
+            ("pages.database_init", "/settings/database-init"),
+            ("pages.database_init_start", "/settings/database-init/start"),
+            ("pages.database_init_result", "/settings/database-init/result"),
+            ("pages.student_maintain", "/students/maintain"),
+            (
+                "pages.student_maintain_search",
+                "/students/maintain/api/students",
+            ),
+            (
+                "pages.student_maintain_get",
+                "/students/maintain/api/students/<int:student_id>",
+            ),
+            (
+                "pages.student_maintain_update",
+                "/students/maintain/api/students/<int:student_id>",
+            ),
+            (
+                "pages.student_maintain_delete",
+                "/students/maintain/api/students/<int:student_id>",
+            ),
+            (
+                "pages.university_generate_start",
+                "/universities/generate/start",
+            ),
+            (
+                "pages.university_generate_result",
+                "/universities/generate/result",
+            ),
+
         }
         actual_routes = [
             (rule.endpoint, rule.rule)

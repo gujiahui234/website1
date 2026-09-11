@@ -104,6 +104,8 @@ def create_app(test_config: dict[str, object] | None = None) -> Flask:
         API_SERVER_DOCS=os.getenv("API_SERVER_DOCS", ""),
         API_SERVER_REDOC=os.getenv("API_SERVER_REDOC", ""),
         API_SERVER_JSON=os.getenv("API_SERVER_JSON", ""),
+        # Celery 任务平台 API 服务器（alt_celery3）任务目录地址。
+        API_SERVER_TASKS=os.getenv("API_SERVER_TASKS", ""),
     )
     if test_config is not None:
         app.config.update(test_config)

@@ -50,6 +50,15 @@
             </ul>
           </li>
           <li class="nav-item dropdown">
+            <a class="nav-link dropdown-toggle{{ ' active' if request.endpoint and request.endpoint.startswith('pages.simulation_') }}" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">模拟</a>
+            <ul class="dropdown-menu dropdown-menu-end">
+              <li><a class="dropdown-item" href="{{ url_for('pages.simulation_ncee') }}">高考</a></li>
+              <li><a class="dropdown-item" href="{{ url_for('pages.simulation_admission') }}">录取</a></li>
+              <li><a class="dropdown-item" href="{{ url_for('pages.simulation_exam') }}">日常考试</a></li>
+              <li><a class="dropdown-item" href="{{ url_for('pages.simulation_graduate') }}">毕业</a></li>
+            </ul>
+          </li>
+          <li class="nav-item dropdown">
             <a class="nav-link dropdown-toggle{{ ' active' if request.endpoint in ['pages.analytics_students_by_year', 'pages.analytics_students_by_university'] }}" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">统计分析</a>
             <ul class="dropdown-menu dropdown-menu-end">
               <li><a class="dropdown-item" href="{{ url_for('pages.analytics_students_by_year') }}">历年学生数量统计</a></li>

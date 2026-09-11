@@ -16,6 +16,7 @@ from alt_web01.views import (  # noqa: E402, F401
     enrollment_manual,
     home,
     major_group_add,
+    simulation,
     student_add,
     student_import_large,
     student_import_small,

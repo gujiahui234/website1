@@ -1,0 +1,194 @@
+{% extends "base.html" %}
+
+{% block title %}{{ spec.title }} · alt_web01{% endblock %}
+
+{% block content %}
+<section class="student-workspace" aria-labelledby="page-title">
+  <header class="student-heading">
+    <div>
+      <p class="page-kicker">{{ spec.kicker }}</p>
+      <h1 id="page-title">{{ spec.title }}</h1>
+      <p class="student-intro">{{ spec.intro }}</p>
+    </div>
+    <div class="range-note" aria-label="允许的年份范围">
+      <span>年份范围</span>
+      <strong>{{ year_min }}-{{ year_max }}</strong>
+    </div>
+  </header>
+
+  <div class="student-card">
+    <form id="sim-form" class="student-form" aria-label="{{ spec.title }}模拟">
+      <div class="form-field">
+        <label for="sim-year">{{ spec.year_label }}（{{ year_min }}-{{ year_max }}）</label>
+        <input id="sim-year" name="year" type="number" min="{{ year_min }}" max="{{ year_max }}"
+               step="1" value="2026" required>
+      </div>
+      <div class="form-actions">
+        <button class="button button-secondary" id="count-button" type="button">查询人数</button>
+        <button class="button button-primary" id="run-button" type="submit">{{ spec.action_label }}</button>
+      </div>
+    </form>
+    <p class="storage-note">统计口径：{{ spec.eligible_desc }}</p>
+  </div>
+
+  <div id="feedback-area" aria-live="polite"></div>
+  <div id="result-area" aria-live="polite"></div>
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script>
+(function () {
+  "use strict";
+
+  var YEAR_MIN = {{ year_min }};
+  var YEAR_MAX = {{ year_max }};
+
+  var ELIGIBLE_URL = "{{ eligible_url }}";
+  var DISPATCH_URL = "{{ dispatch_url }}";
+  var RESULT_URL_PREFIX = "{{ result_url }}";
+
+  var RESULT_FIELDS = {{ spec.result_fields | tojson }};
+
+  var form = document.getElementById("sim-form");
+  var countButton = document.getElementById("count-button");
+  var runButton = document.getElementById("run-button");
+  var feedbackArea = document.getElementById("feedback-area");
+  var resultArea = document.getElementById("result-area");
+
+  var taskId = null;
+  var pollTimer = null;
+  var POLL_INTERVAL_MS = 3000;
+
+  function showNotice(html, kind) {
+    feedbackArea.innerHTML =
+      '<div class="notice notice-' + kind + '" role="status">' + html + "</div>";
+  }
+
+  function spinner(text) {
+    return '<span class="spinner-border spinner-border-sm" aria-hidden="true"></span> ' + text;
+  }
+
+  function readYear() {
+    var value = Number(form.elements["year"].value);
+    if (!Number.isInteger(value) || value < YEAR_MIN || value > YEAR_MAX) {
+      showNotice("年份必须是 " + YEAR_MIN + " 到 " + YEAR_MAX + " 之间的整数。", "error");
+      return null;
+    }
+    return value;
+  }
+
+  function fetchJson(url, options) {
+    return fetch(url, options).then(function (response) {
+      return response.json().then(function (data) {
+        if (!response.ok) {
+          throw new Error(data.error || "请求失败（HTTP " + response.status + "）。");
+        }
+        return data;
+      });
+    });
+  }
+
+  function stopPolling() {
+    if (pollTimer !== null) {
+      window.clearInterval(pollTimer);
+      pollTimer = null;
+    }
+  }
+
+  function queryEligible() {
+    var year = readYear();
+    if (year === null) { return; }
+    countButton.disabled = true;
+    showNotice(spinner("正在查询人数…"), "info");
+    fetchJson(ELIGIBLE_URL + "?year=" + year)
+      .then(function (data) {
+        showNotice(
+          "{{ spec.eligible_desc }}（" + year + "）：<strong>" +
+          Number(data.eligible).toLocaleString("zh-CN") + "</strong> 人",
+          "success"
+        );
+      })
+      .catch(function (error) { showNotice(error.message, "error"); })
+      .finally(function () { countButton.disabled = false; });
+  }
+
+  function renderResult(result) {
+    var rows = "";
+    Object.keys(RESULT_FIELDS).forEach(function (key) {
+      if (result[key] === undefined || result[key] === null) { return; }
+      var value = result[key];
+      if (typeof value === "object") { value = JSON.stringify(value); }
+      rows += "<tr><td>" + RESULT_FIELDS[key] + "</td><td>" +
+        String(value).replace(/</g, "&lt;") + "</td></tr>";
+    });
+    resultArea.innerHTML =
+      '<section class="saved-roster"><div class="roster-heading"><div>' +
+      '<p class="page-kicker">{{ spec.action_label }}结果</p><h2>执行完成</h2></div></div>' +
+      '<div class="table-wrap"><table class="student-data-table">' +
+      "<thead><tr><th>项目</th><th>值</th></tr></thead><tbody>" + rows +
+      "</tbody></table></div></section>";
+  }
+
+  function pollResult() {
+    if (!taskId) { return; }
+    fetchJson(RESULT_URL_PREFIX + "/" + encodeURIComponent(taskId))
+      .then(function (data) {
+        if (data.state === "PROGRESS") {
+          var meta = data.progress || {};
+          var detail = Object.keys(meta).map(function (key) {
+            return key + "=" + meta[key];
+          }).join("，");
+          showNotice(spinner("任务执行中…" + (detail ? "（" + detail + "）" : "")), "info");
+          return;
+        }
+        stopPolling();
+        runButton.disabled = false;
+        if (!data.ready) { return; }
+        if (data.ok) {
+          showNotice("任务执行完成。", "success");
+          renderResult(data.result || {});
+        } else {
+          showNotice("任务执行失败：" + (data.result || "未知错误"), "error");
+        }
+      })
+      .catch(function (error) {
+        stopPolling();
+        runButton.disabled = false;
+        showNotice(error.message, "error");
+      });
+  }
+
+  form.addEventListener("submit", function (event) {
+    event.preventDefault();
+    var year = readYear();
+    if (year === null || runButton.disabled) { return; }
+
+    runButton.disabled = true;
+    countButton.disabled = true;
+    resultArea.innerHTML = "";
+    showNotice(spinner("正在派发{{ spec.action_label }}任务…"), "info");
+
+    fetchJson(DISPATCH_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ year: year }),
+    })
+      .then(function (data) {
+        taskId = data.task_id;
+        showNotice(spinner("任务已派发（ID=" + taskId + "），等待执行结果…"), "info");
+        stopPolling();
+        pollTimer = window.setInterval(pollResult, POLL_INTERVAL_MS);
+        pollResult();
+      })
+      .catch(function (error) {
+        runButton.disabled = false;
+        countButton.disabled = false;
+        showNotice(error.message, "error");
+      });
+  });
+
+  countButton.addEventListener("click", queryEligible);
+})();
+</script>
+{% endblock %}
