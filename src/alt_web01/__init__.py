@@ -83,6 +83,9 @@ def _register_logging_middleware(app: Flask) -> None:
             status_code=response.status_code,
             elapsed_ms=round((perf_counter() - started_at) * 1000, 2),
         ).info("Flask 请求完成")
+        # 防止浏览器缓存页面（否则前端脚本更新后旧标签页仍运行旧逻辑）。
+        if response.mimetype == "text/html":
+            response.headers["Cache-Control"] = "no-store"
         return response
 
     @app.errorhandler(Exception)
