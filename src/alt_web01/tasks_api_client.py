@@ -91,7 +91,10 @@ def _request(
             method, path, json=json_body, params=params
         )
     except httpx.HTTPError as exc:
-        raise RuntimeError(f"任务 API 服务器连接失败：{exc}") from exc
+        client = get_tasks_api_client()
+        raise RuntimeError(
+            f"任务 API 服务器连接失败（{client.base_url}）：{exc}"
+        ) from exc
 
 
 def eligible_count(task_name: str, year: int) -> int:
