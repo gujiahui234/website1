@@ -178,7 +178,7 @@
     })
       .then(function (data) {
         taskId = data.task_id;
-        showNotice(spinner("任务已派发（ID=" + taskId + "），等待执行结果…"), "info");
+        showNotice(spinner("【前端 v3】任务已派发（ID=" + taskId + "），等待执行结果…"), "info");
         stopPolling();
         pollTimer = window.setInterval(pollResult, POLL_INTERVAL_MS);
         pollResult();
