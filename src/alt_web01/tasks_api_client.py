@@ -119,7 +119,11 @@ def eligible_count(task_name: str, year: int) -> int:
     if response.status_code == 404:
         raise LookupError(f"任务 {task_name} 没有参与人数统计规则。")
     if response.status_code != 200:
-        raise RuntimeError("查询参与人数失败。")
+        raise RuntimeError(
+            f"查询参与人数失败（HTTP {response.status_code}，"
+            f"{get_tasks_api_client().base_url}）："
+            f"{response.text[:200] or '无响应体'}"
+        )
     return int(response.json()["eligible"])
 
 
