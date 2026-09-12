@@ -52,6 +52,9 @@ def get_tasks_api_client() -> httpx.Client:
             _client = httpx.Client(
                 base_url=_base_url(),
                 timeout=_REQUEST_TIMEOUT_SECONDS,
+                # 目标仅为本机/内网 API，禁用系统代理环境变量
+                # （否则 no_proxy 的 CIDR 写法不被识别，请求会被代理拒绝为 502）。
+                trust_env=False,
             )
         return _client
 
