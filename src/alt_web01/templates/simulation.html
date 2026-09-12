@@ -142,10 +142,14 @@
           showNotice(spinner("任务执行中…" + (detail ? "（" + detail + "）" : "")), "info");
           return;
         }
+        if (!data.ready) {
+          // PENDING：worker 尚未领取任务。继续轮询，绝不能在这里停表。
+          showNotice(spinner("任务已进入队列，等待 worker 执行…"), "info");
+          return;
+        }
         stopPolling();
         runButton.disabled = false;
         countButton.disabled = false;
-        if (!data.ready) { return; }
         if (data.state === "SUCCESS") {
           showNotice("任务执行完成。", "success");
           renderResult(data.result || {});
