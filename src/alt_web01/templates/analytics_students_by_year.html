@@ -1,0 +1,123 @@
+{% extends "base.html" %}
+
+{% block title %}历年学生数量统计 · alt_web01{% endblock %}
+
+{% block vendor_styles %}
+  <style>
+    .chart-card {
+      background: rgb(255 255 255 / 88%);
+      border: 1px solid rgb(23 59 79 / 9%);
+      border-radius: 1.6rem;
+      box-shadow: 0 1.25rem 3.5rem rgb(40 105 117 / 9%);
+      padding: 2rem;
+    }
+    #student-count-chart {
+      width: 100%;
+      height: 30rem;
+    }
+    .chart-caption { margin: 0.8rem 0 0; color: var(--campus-muted); font-size: 0.8rem; }
+  </style>
+{% endblock %}
+
+{% block content %}
+<section class="student-workspace" aria-labelledby="page-title">
+  <header class="student-heading">
+    <div>
+      <p class="page-kicker">统计分析 · 学生数量</p>
+      <h1 id="page-title">历年学生数量统计</h1>
+      <p class="student-intro">
+        按入学学年统计历年学生数量（含在读与已毕业），数据来自任务平台的业务库。
+      </p>
+    </div>
+    <div class="range-note" aria-label="统计口径">
+      <span>统计口径</span>
+      <strong>入学学年</strong>
+    </div>
+  </header>
+
+  <div class="chart-card">
+    <div id="student-count-chart" aria-label="历年学生数量柱状图"></div>
+    <div id="chart-error" class="notice notice-error" role="alert" hidden></div>
+    <p class="chart-caption">统计口径：按入学学年（academic_year）分组计数，鼠标悬停查看数值。</p>
+  </div>
+</section>
+{% endblock %}
+
+{% block scripts %}
+  <script src="https://cdn.jsdelivr.net/npm/echarts@5.5.1/dist/echarts.min.js"></script>
+  <script>
+  (function () {
+    "use strict";
+
+    var chartDom = document.getElementById("student-count-chart");
+    var chart = echarts.init(chartDom);
+    var dataUrl = "{{ data_url }}";
+    var errorBox = document.getElementById("chart-error");
+
+    function renderChart(items) {
+      var years = items.map(function (item) { return String(item.year); });
+      var counts = items.map(function (item) { return item.count; });
+      chart.setOption({
+        tooltip: {
+          trigger: "axis",
+          axisPointer: { type: "shadow" },
+          formatter: function (params) {
+            var p = params[0];
+            return p.name + " 学年入学：<strong>" +
+              Number(p.value).toLocaleString("zh-CN") + "</strong> 人";
+          },
+        },
+        grid: { left: 80, right: 30, top: 40, bottom: 60 },
+        xAxis: {
+          type: "category",
+          data: years,
+          name: "入学学年",
+          axisLabel: { interval: 0, rotate: years.length > 12 ? 45 : 0 },
+        },
+        yAxis: {
+          type: "value",
+          name: "学生数量",
+          axisLabel: { formatter: function (v) { return Number(v).toLocaleString("zh-CN"); } },
+        },
+        series: [{
+          name: "学生数量",
+          type: "bar",
+          data: counts,
+          barMaxWidth: 56,
+          itemStyle: { color: "#167f73", borderRadius: [6, 6, 0, 0] },
+          label: {
+            show: items.length <= 20,
+            position: "top",
+            formatter: function (p) { return Number(p.value).toLocaleString("zh-CN"); },
+          },
+        }],
+      });
+    }
+
+    function loadAndRender() {
+      fetchJson(dataUrl).then(renderChart).catch(function (error) {
+        showError(error.message);
+      });
+    }
+
+    function fetchJson(url) {
+      return fetch(url).then(function (response) {
+        return response.json().then(function (data) {
+          if (!response.ok) {
+            throw new Error(data.error || "请求失败（HTTP " + response.status + "）。");
+          }
+          return data;
+        });
+      }).then(function (data) { return data.items || []; });
+    }
+
+    function showError(message) {
+      errorBox.textContent = message;
+      errorBox.hidden = false;
+    }
+
+    window.addEventListener("resize", function () { chart.resize(); });
+    loadAndRender();
+  })();
+  </script>
+{% endblock %}

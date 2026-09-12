@@ -235,3 +235,24 @@ def delete_student(student_id: int) -> None:
             else "删除学生失败。"
         )
         raise APIClientError(message, status_code=response.status_code)
+
+
+def stat_count_students_num() -> list[dict[str, int]]:
+    """Fetch the per-year student count statistic from the API server.
+
+    The statistic groups ``web_db.enrollments`` by academic year, i.e. it
+    reports how many students entered a university in each year.
+
+    Returns:
+        A list of ``{"year": int, "count": int}`` buckets ordered by year
+        ascending (may be empty when no enrollments exist).
+
+    Raises:
+        APIClientError: When the API server returns an error.
+    """
+    response = _request("GET", "/api/v1/stats/stat_count_students_num")
+    if response.status_code != 200:
+        raise APIClientError(
+            "学生数量统计查询失败。", status_code=response.status_code
+        )
+    return list(response.json().get("items", []))
