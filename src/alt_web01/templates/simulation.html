@@ -144,12 +144,14 @@
         }
         stopPolling();
         runButton.disabled = false;
+        countButton.disabled = false;
         if (!data.ready) { return; }
-        if (data.ok) {
+        if (data.state === "SUCCESS") {
           showNotice("任务执行完成。", "success");
           renderResult(data.result || {});
         } else {
-          showNotice("任务执行失败：" + (data.result || "未知错误"), "error");
+          showNotice(
+            "任务执行失败：" + (data.error || data.result || "未知错误"), "error");
         }
       })
       .catch(function (error) {
