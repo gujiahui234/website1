@@ -161,6 +161,29 @@ SIMULATIONS: dict[str, _SimulationSpec] = {
                 "note": "说明",
             },
         ),
+        _SimulationSpec(
+            slug="one-stop",
+            title="一条龙毕业",
+            kicker="模拟 · 一条龙毕业",
+            intro="对同一批次学生依次执行：高考评测 → 高校录取 → 日常考试 → 本科毕业，"
+            "并汇总各环节统计数据。",
+            year_label="高考年份",
+            eligible_desc="入批考生（状态=0 未高考，考试当年 17-19 岁）",
+            action_label="一条龙毕业",
+            task_name="tasks.pipeline.one_stop_graduation",
+            payload_key="ncee_year",
+            result_fields={
+                "ncee_year": "高考年份",
+                "exam_years": "模拟考试学年数",
+                "examined": "本批次高考学生数",
+                "admitted": "本批次录取学生数",
+                "exams_recorded": "本批次日常考试场次",
+                "graduated": "本批次毕业学生数",
+                "average_gpa": "平均绩点",
+                "admitted_by_nature": "按高校性质录取统计",
+                "elapsed_seconds": "总耗时（秒）",
+            },
+        ),
     )
 }
 

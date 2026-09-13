@@ -9,6 +9,7 @@ pages = Blueprint("pages", __name__)
 # Import every page module after creating the shared blueprint so their route
 # decorators are registered before the application registers ``pages``.
 from alt_web01.views import (  # noqa: E402, F401
+    analytics_scores_dashboard,
     analytics_students_by_university,
     analytics_students_by_year,
     database_init,

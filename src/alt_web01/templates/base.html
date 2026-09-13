@@ -56,11 +56,13 @@
               <li><a class="dropdown-item" href="{{ url_for('pages.simulation_admission') }}">录取</a></li>
               <li><a class="dropdown-item" href="{{ url_for('pages.simulation_exam') }}">日常考试</a></li>
               <li><a class="dropdown-item" href="{{ url_for('pages.simulation_graduate') }}">毕业</a></li>
+              <li><a class="dropdown-item" href="{{ url_for('pages.simulation_one-stop') }}">一条龙毕业</a></li>
             </ul>
           </li>
           <li class="nav-item dropdown">
-            <a class="nav-link dropdown-toggle{{ ' active' if request.endpoint in ['pages.analytics_students_by_year', 'pages.analytics_students_by_university'] }}" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">统计分析</a>
+            <a class="nav-link dropdown-toggle{{ ' active' if request.endpoint in ['pages.analytics_students_by_year', 'pages.analytics_students_by_university', 'pages.analytics_scores_dashboard'] }}" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">统计分析</a>
             <ul class="dropdown-menu dropdown-menu-end">
+              <li><a class="dropdown-item" href="{{ url_for('pages.analytics_scores_dashboard') }}">成绩分析看板</a></li>
               <li><a class="dropdown-item" href="{{ url_for('pages.analytics_students_by_year') }}">历年学生数量统计</a></li>
               <li><a class="dropdown-item" href="{{ url_for('pages.analytics_students_by_university') }}">各大学学生数量统计</a></li>
             </ul>

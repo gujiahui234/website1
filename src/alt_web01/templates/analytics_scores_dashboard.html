@@ -1,0 +1,706 @@
+{% extends "base.html" %}
+
+{% block title %}成绩分析看板 · alt_web01{% endblock %}
+
+{% block vendor_styles %}
+  <style>
+    .kpi-card {
+      background: rgb(255 255 255 / 88%);
+      border: 1px solid rgb(23 59 79 / 9%);
+      border-radius: 1.2rem;
+      box-shadow: 0 .6rem 1.8rem rgb(40 105 117 / 7%);
+      padding: 1rem 1.2rem;
+      height: 100%;
+    }
+    .kpi-label { font-size: .8rem; color: var(--campus-muted, #5b6b73); margin: 0; }
+    .kpi-value { font-size: 1.55rem; font-weight: 700; line-height: 1.25; margin: .2rem 0 0; }
+    .kpi-sub { font-size: .72rem; color: var(--campus-muted, #8a979e); margin: .15rem 0 0; }
+    .chart-card {
+      background: rgb(255 255 255 / 88%);
+      border: 1px solid rgb(23 59 79 / 9%);
+      border-radius: 1.6rem;
+      box-shadow: 0 1.25rem 3.5rem rgb(40 105 117 / 9%);
+      padding: 1.5rem;
+      height: 100%;
+    }
+    .chart-title { font-size: 1rem; font-weight: 600; margin: 0 0 .2rem; }
+    .chart-subtitle { font-size: .78rem; color: var(--campus-muted, #5b6b73); margin: 0 0 .6rem; }
+    .chart-body { width: 100%; height: 21rem; }
+    .chart-body-tall { height: 26rem; }
+    .chart-caption { margin: .6rem 0 0; color: var(--campus-muted); font-size: .76rem; }
+    .metric-toggle .btn.active { background: #167f73; border-color: #167f73; color: #fff; }
+    #stability-chart, #corr-chart { height: 24rem; }
+  </style>
+{% endblock %}
+
+{% block content %}
+<section aria-labelledby="page-title">
+  <header class="student-heading">
+    <div>
+      <p class="page-kicker">统计分析 · 成绩</p>
+      <h1 id="page-title">成绩分析看板</h1>
+      <p class="student-intro">
+        高考、本科成绩与 GPA 的综合分析：分布、趋势、对比、关联与流向。
+        全部统计在数据库内预聚合，页面只加载聚合结果。
+      </p>
+    </div>
+    <div class="range-note" aria-label="数据来源">
+      <span>数据来源</span>
+      <strong>web_db 业务库</strong>
+    </div>
+  </header>
+
+  <!-- 全局筛选 -->
+  <div class="chart-card mb-3">
+    <div class="d-flex flex-wrap gap-3 align-items-center">
+      <div class="metric-toggle btn-group btn-group-sm" role="group" aria-label="高校性质筛选" id="nature-filter">
+        <button type="button" class="btn btn-outline-secondary active" data-nature="">全部高校</button>
+        <button type="button" class="btn btn-outline-secondary" data-nature="985">985</button>
+        <button type="button" class="btn btn-outline-secondary" data-nature="211">211</button>
+        <button type="button" class="btn btn-outline-secondary" data-nature="一本">一本</button>
+        <button type="button" class="btn btn-outline-secondary" data-nature="其他">其他</button>
+      </div>
+      <select id="year-filter" class="form-select form-select-sm w-auto" aria-label="高考年份筛选">
+        <option value="">高考年份：全部</option>
+      </select>
+      <span id="loading-indicator" class="spinner-border spinner-border-sm text-secondary" role="status" aria-hidden="true"></span>
+    </div>
+    <div id="data-error" class="notice notice-error mt-3" role="alert" hidden></div>
+    <div id="empty-notice" class="notice mt-3" role="status" hidden>
+      暂无成绩数据：请先在“模拟”菜单运行 高考 → 录取 → 日常考试 → 毕业 任务生成数据。
+    </div>
+  </div>
+
+  <!-- KPI 卡片 -->
+  <div class="row g-3 mb-3" id="kpi-row">
+    <div class="col-6 col-md-4 col-xl-2"><div class="kpi-card"><p class="kpi-label">参加高考人数</p><p class="kpi-value" id="kpi-ncee-count">–</p><p class="kpi-sub" id="kpi-ncee-count-sub">&nbsp;</p></div></div>
+    <div class="col-6 col-md-4 col-xl-2"><div class="kpi-card"><p class="kpi-label">高考平均分</p><p class="kpi-value" id="kpi-ncee-avg">–</p><p class="kpi-sub" id="kpi-ncee-avg-sub">&nbsp;</p></div></div>
+    <div class="col-6 col-md-4 col-xl-2"><div class="kpi-card"><p class="kpi-label">本科考试平均分</p><p class="kpi-value" id="kpi-ug-avg">–</p><p class="kpi-sub" id="kpi-ug-avg-sub">&nbsp;</p></div></div>
+    <div class="col-6 col-md-4 col-xl-2"><div class="kpi-card"><p class="kpi-label">本科及格率</p><p class="kpi-value" id="kpi-pass-rate">–</p><p class="kpi-sub" id="kpi-pass-rate-sub">&nbsp;</p></div></div>
+    <div class="col-6 col-md-4 col-xl-2"><div class="kpi-card"><p class="kpi-label">平均 GPA</p><p class="kpi-value" id="kpi-gpa">–</p><p class="kpi-sub" id="kpi-gpa-sub">&nbsp;</p></div></div>
+    <div class="col-6 col-md-4 col-xl-2"><div class="kpi-card"><p class="kpi-label">毕业人数</p><p class="kpi-value" id="kpi-grad-count">–</p><p class="kpi-sub" id="kpi-grad-count-sub">&nbsp;</p></div></div>
+  </div>
+
+  <div class="row g-3 mb-3">
+    <div class="col-12">
+      <div class="chart-card">
+        <p class="chart-title">高考成绩分布（直方图 + 正态曲线）</p>
+        <p class="chart-subtitle">柱：实际人数 · 线：按均值/标准差拟合的正态分布</p>
+        <div id="ncee-dist-chart" class="chart-body chart-body-tall"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="row g-3 mb-3">
+    <div class="col-lg-5">
+      <div class="chart-card">
+        <p class="chart-title">高考成绩区间人数</p>
+        <div id="ncee-bands-chart" class="chart-body"></div>
+      </div>
+    </div>
+    <div class="col-lg-7">
+      <div class="chart-card">
+        <p class="chart-title">高考成绩年度趋势</p>
+        <p class="chart-subtitle">平均分 / 中位数 / P25 / P75（按考试年份）</p>
+        <div id="ncee-trend-chart" class="chart-body"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="row g-3 mb-3">
+    <div class="col-lg-6">
+      <div class="chart-card">
+        <p class="chart-title">本科成绩分段分布</p>
+        <div class="metric-toggle btn-group btn-group-sm mb-2" role="group" aria-label="统计口径" id="ug-dist-toggle">
+          <button type="button" class="btn btn-outline-secondary active" data-metric="counts">考试次数</button>
+          <button type="button" class="btn btn-outline-secondary" data-metric="students">学生人数</button>
+          <button type="button" class="btn btn-outline-secondary" data-metric="share">占比</button>
+        </div>
+        <div id="ug-dist-chart" class="chart-body"></div>
+        <p class="chart-caption">“考试次数”与“学生人数”口径不同：一名学生考 8 次计 8 条考试记录、1 名学生。</p>
+      </div>
+    </div>
+    <div class="col-lg-6">
+      <div class="chart-card">
+        <p class="chart-title">年级成绩趋势（大一 → 大四）</p>
+        <p class="chart-subtitle">实线：中位数与平均分 · 阴影带：P25–P75 区间</p>
+        <div id="grade-trend-chart" class="chart-body"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="row g-3 mb-3">
+    <div class="col-lg-6">
+      <div class="chart-card">
+        <p class="chart-title">不同高校性质成绩对比（箱线图）</p>
+        <div class="metric-toggle btn-group btn-group-sm mb-2" role="group" aria-label="对比指标" id="nature-box-toggle">
+          <button type="button" class="btn btn-outline-secondary active" data-box="ug">本科平均成绩</button>
+          <button type="button" class="btn btn-outline-secondary" data-box="gpa">GPA</button>
+        </div>
+        <div id="nature-box-chart" class="chart-body"></div>
+        <p class="chart-caption">按学生入学高校性质分组；箱体为 Q1–Q3，横线为中位数，须为最小/最大值（由分箱直方图近似）。</p>
+      </div>
+    </div>
+    <div class="col-lg-6">
+      <div class="chart-card">
+        <p class="chart-title">平均成绩 × 成绩稳定性</p>
+        <p class="chart-subtitle">横轴：个人本科平均分 · 纵轴：个人成绩标准差 σ · 气泡大小：人数</p>
+        <div id="stability-chart"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="row g-3 mb-3">
+    <div class="col-lg-6">
+      <div class="chart-card">
+        <p class="chart-title">高考成绩 × 本科平均成绩</p>
+        <p class="chart-subtitle">每 5 分一个高考分数段，取段内学生本科平均分（后端预聚合）</p>
+        <div id="scatter-ug-chart" class="chart-body"></div>
+      </div>
+    </div>
+    <div class="col-lg-6">
+      <div class="chart-card">
+        <p class="chart-title" id="scatter-gpa-title">高考成绩 × GPA</p>
+        <div id="scatter-gpa-chart" class="chart-body"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="row g-3 mb-3">
+    <div class="col-lg-5">
+      <div class="chart-card">
+        <p class="chart-title">成绩指标相关性矩阵</p>
+        <p class="chart-subtitle">皮尔逊相关系数（按学生聚合后计算）</p>
+        <div id="corr-chart"></div>
+      </div>
+    </div>
+    <div class="col-lg-7">
+      <div class="chart-card">
+        <p class="chart-title">学生成绩生命周期流向</p>
+        <p class="chart-subtitle">高考分数段 → 高校性质 → 本科成绩等级 → GPA 等级</p>
+        <div id="sankey-chart" class="chart-body"></div>
+      </div>
+    </div>
+  </div>
+</section>
+{% endblock %}
+
+{% block scripts %}
+  <script src="https://cdn.jsdelivr.net/npm/echarts@5.5.1/dist/echarts.min.js"></script>
+  <script>
+  (function () {
+    "use strict";
+
+    var dataUrl = "{{ data_url }}";
+    var PALETTE = ["#167f73", "#2b8aef", "#e8590c", "#9c36b5", "#f59f00", "#495057"];
+    var state = { nature: "", nceeYear: "", ugMetric: "counts", boxMetric: "ug" };
+    var lastData = null;
+    var loading = document.getElementById("loading-indicator");
+    var errorBox = document.getElementById("data-error");
+    var emptyBox = document.getElementById("empty-notice");
+
+    var chartIds = ["ncee-dist-chart", "ncee-bands-chart", "ncee-trend-chart",
+      "ug-dist-chart", "grade-trend-chart", "nature-box-chart", "stability-chart",
+      "scatter-ug-chart", "scatter-gpa-chart", "corr-chart", "sankey-chart"];
+    var charts = {};
+    chartIds.forEach(function (id) { charts[id] = echarts.init(document.getElementById(id)); });
+
+    window.addEventListener("resize", function () {
+      chartIds.forEach(function (id) { charts[id].resize(); });
+    });
+
+    function fmtInt(value) {
+      return value === null || value === undefined ? "–" : Number(value).toLocaleString("zh-CN");
+    }
+    function fmtNum(value, digits) {
+      return value === null || value === undefined ? "–" : Number(value).toFixed(digits);
+    }
+    function pct(value) {
+      return value === null || value === undefined ? "–" : (value * 100).toFixed(2) + "%";
+    }
+
+    function baseGrid() { return { left: 70, right: 30, top: 45, bottom: 50 }; }
+
+    // ---------------- KPI ----------------
+    function renderKpi(kpi) {
+      document.getElementById("kpi-ncee-count").textContent = fmtInt(kpi.ncee_count);
+      document.getElementById("kpi-ncee-count-sub").textContent =
+        "在读/已毕业口径：" + fmtInt(kpi.ug_students) + " 名有本科成绩";
+      document.getElementById("kpi-ncee-avg").textContent = fmtNum(kpi.ncee_avg, 1);
+      document.getElementById("kpi-ncee-avg-sub").textContent = "σ = " + fmtNum(kpi.ncee_std, 1);
+      document.getElementById("kpi-ug-avg").textContent = fmtNum(kpi.ug_avg, 1);
+      document.getElementById("kpi-ug-avg-sub").textContent = "按考试次数加权";
+      document.getElementById("kpi-pass-rate").textContent = pct(kpi.pass_rate);
+      document.getElementById("kpi-pass-rate-sub").textContent = "单科 ≥ 60 分占比";
+      document.getElementById("kpi-gpa").textContent = fmtNum(kpi.gpa_avg, 2);
+      document.getElementById("kpi-gpa-sub").textContent = "毕业学生口径";
+      document.getElementById("kpi-grad-count").textContent = fmtInt(kpi.grad_count);
+      document.getElementById("kpi-grad-count-sub").textContent = "graduation_scores 记录数";
+    }
+
+    // ---------------- 1. 高考成绩分布 ----------------
+    function renderNceeDist(data) {
+      var hist = data.ncee_hist;
+      var labels = hist.bins.map(function (b) { return b + "-" + (b + 4); });
+      var curve = [];
+      var total = hist.total, width = 5;
+      if (hist.mean !== null && hist.std !== null && hist.std > 0) {
+        curve = hist.bins.map(function (b) {
+          var x = b + 2.5;
+          var pdf = Math.exp(-Math.pow(x - hist.mean, 2) / (2 * hist.std * hist.std))
+            / (hist.std * Math.sqrt(2 * Math.PI));
+          return Math.round(total * width * pdf);
+        });
+      }
+      charts["ncee-dist-chart"].setOption({
+        color: PALETTE,
+        tooltip: {
+          trigger: "axis",
+          formatter: function (params) {
+            var p = params[0];
+            var share = total ? (p.value / total * 100).toFixed(2) + "%" : "–";
+            var html = "成绩区间：" + p.name + "<br>人数：" + fmtInt(p.value) + "（" + share + "）";
+            params.forEach(function (item) {
+              if (item.seriesName === "正态分布") {
+                html += "<br>" + item.marker + "正态拟合：" + fmtInt(item.value);
+              }
+            });
+            return html;
+          },
+        },
+        legend: { top: 0 },
+        grid: baseGrid(),
+        xAxis: { type: "category", data: labels, name: "高考成绩",
+                 axisLabel: { interval: Math.ceil(labels.length / 26) } },
+        yAxis: { type: "value", name: "人数",
+                 axisLabel: { formatter: function (v) { return fmtInt(v); } } },
+        series: [
+          { name: "学生人数", type: "bar", data: hist.counts, barMaxWidth: 22,
+            itemStyle: { color: "#167f73" } },
+          { name: "正态分布", type: "line", data: curve, smooth: true,
+            showSymbol: false, lineStyle: { color: "#e8590c", width: 2 },
+            itemStyle: { color: "#e8590c" } },
+        ],
+      });
+    }
+
+    // ---------------- 2. 高考成绩区间人数 ----------------
+    function renderNceeBands(data) {
+      var bands = data.ncee_bands;
+      charts["ncee-bands-chart"].setOption({
+        color: PALETTE,
+        tooltip: {
+          formatter: function (p) {
+            var share = data.ncee_hist.total ? (p.value / data.ncee_hist.total * 100).toFixed(2) + "%" : "–";
+            return p.name + " 分：<strong>" + fmtInt(p.value) + "</strong> 人（" + share + "）";
+          },
+        },
+        grid: baseGrid(),
+        xAxis: { type: "value", name: "人数",
+                 axisLabel: { formatter: function (v) { return fmtInt(v); } } },
+        yAxis: { type: "category", data: bands.map(function (b) { return b.label; }),
+                 inverse: true },
+        series: [{
+          type: "bar", data: bands.map(function (b) { return b.count; }),
+          barMaxWidth: 28, itemStyle: { color: "#2b8aef", borderRadius: [0, 6, 6, 0] },
+          label: { show: true, position: "right",
+                   formatter: function (p) { return fmtInt(p.value); } },
+        }],
+      });
+    }
+
+    // ---------------- 3. 高考年度趋势 ----------------
+    function renderNceeTrend(data) {
+      var trend = data.ncee_trend;
+      charts["ncee-trend-chart"].setOption({
+        color: PALETTE,
+        tooltip: { trigger: "axis" },
+        legend: { top: 0 },
+        grid: baseGrid(),
+        xAxis: { type: "category", data: trend.years.map(String), name: "高考年份" },
+        yAxis: { type: "value", name: "分数", scale: true },
+        series: [
+          { name: "平均分", type: "line", data: trend.avg, smooth: true, lineWidth: 3 },
+          { name: "中位数", type: "line", data: trend.median, smooth: true },
+          { name: "P25", type: "line", data: trend.p25, smooth: true, lineStyle: { type: "dashed" } },
+          { name: "P75", type: "line", data: trend.p75, smooth: true, lineStyle: { type: "dashed" } },
+        ],
+      });
+    }
+
+    // ---------------- 4. 本科成绩分段分布 ----------------
+    function renderUgDist(data) {
+      var dist = data.ug_dist;
+      var metric = state.ugMetric;
+      var values, tipName;
+      if (metric === "counts") {
+        values = dist.counts; tipName = "考试次数";
+      } else if (metric === "students") {
+        values = dist.students; tipName = "学生人数";
+      } else {
+        var sum = dist.total_count || 1;
+        values = dist.counts.map(function (c) { return +(c / sum * 100).toFixed(2); });
+        tipName = "占比";
+      }
+      charts["ug-dist-chart"].setOption({
+        color: PALETTE,
+        tooltip: {
+          trigger: "axis",
+          formatter: function (params) {
+            var p = params[0];
+            var index = p.dataIndex;
+            return "分段：" + p.name + "<br>考试次数：" + fmtInt(dist.counts[index]) +
+              "<br>学生人数：" + fmtInt(dist.students[index]) +
+              "<br>考试占比：" + (dist.total_count ? (dist.counts[index] / dist.total_count * 100).toFixed(2) : "0.00") + "%";
+          },
+        },
+        grid: baseGrid(),
+        xAxis: { type: "category", data: dist.bands, name: "成绩分段" },
+        yAxis: { type: "value", name: tipName,
+                 axisLabel: { formatter: function (v) { return fmtInt(v); } } },
+        series: [{
+          name: tipName, type: "bar", data: values, barMaxWidth: 46,
+          itemStyle: { color: metric === "share" ? "#9c36b5" : "#167f73",
+                       borderRadius: [6, 6, 0, 0] },
+          label: { show: dist.bands.length <= 12, position: "top",
+                   formatter: function (p) { return metric === "share" ? p.value + "%" : fmtInt(p.value); } },
+        }],
+      }, { notMerge: true });
+    }
+
+    // ---------------- 5. 年级成绩趋势 ----------------
+    function renderGradeTrend(data) {
+      var trend = data.grade_trend;
+      var bandTop = trend.p75.map(function (v, i) {
+        return (v === null || trend.p25[i] === null) ? null : +(v - trend.p25[i]).toFixed(2);
+      });
+      charts["grade-trend-chart"].setOption({
+        color: PALETTE,
+        tooltip: {
+          trigger: "axis",
+          formatter: function (params) {
+            var index = params[0].dataIndex;
+            return params[0].name + "：<br>" +
+              "P25：" + fmtNum(trend.p25[index], 1) + "　中位数：" + fmtNum(trend.median[index], 1) +
+              "<br>P75：" + fmtNum(trend.p75[index], 1) + "　平均分：" + fmtNum(trend.avg[index], 2);
+          },
+        },
+        legend: { top: 0, data: ["平均分", "中位数", "P25–P75 区间"] },
+        grid: baseGrid(),
+        xAxis: { type: "category", data: trend.grades, name: "年级" },
+        yAxis: { type: "value", name: "成绩", scale: true },
+        series: [
+          { name: "band-base", type: "line", data: trend.p25, stack: "band",
+            symbol: "none", lineStyle: { opacity: 0 }, areaStyle: { opacity: 0 },
+            silent: true, tooltip: { show: false } },
+          { name: "P25–P75 区间", type: "line", data: bandTop, stack: "band",
+            symbol: "none", lineStyle: { opacity: 0 },
+            areaStyle: { color: "rgba(43, 138, 239, 0.18)" },
+            itemStyle: { color: "#2b8aef" } },
+          { name: "中位数", type: "line", data: trend.median, smooth: true,
+            lineStyle: { width: 3 } },
+          { name: "平均分", type: "line", data: trend.avg, smooth: true,
+            lineStyle: { type: "dashed" } },
+        ],
+      });
+    }
+
+    // ---------------- 6. 高校性质箱线图 ----------------
+    function renderNatureBox(data) {
+      var source = state.boxMetric === "gpa" ? data.nature_box_gpa : data.nature_box_ug;
+      var name = state.boxMetric === "gpa" ? "GPA" : "本科平均成绩";
+      charts["nature-box-chart"].setOption({
+        color: PALETTE,
+        tooltip: {
+          trigger: "item",
+          formatter: function (p) {
+            var d = p.data;
+            return p.name + "（" + name + "）<br>最大值：" + fmtNum(d[5] !== undefined ? d[5] : d[4], 2) +
+              "<br>Q3：" + fmtNum(d[3], 2) + "<br>中位数：" + fmtNum(d[2], 2) +
+              "<br>Q1：" + fmtNum(d[1], 2) + "<br>最小值：" + fmtNum(d[0], 2);
+          },
+        },
+        grid: baseGrid(),
+        xAxis: { type: "category", data: source.natures, name: "高校性质" },
+        yAxis: { type: "value", name: name, scale: true },
+        series: [{ name: name, type: "boxplot",
+                   data: source.boxes.map(function (b) { return b || []; }),
+                   itemStyle: { color: "#b8e6e0", borderColor: "#167f73" } }],
+      }, { notMerge: true });
+    }
+
+    // ---------------- 7. 高考 × 本科平均成绩 ----------------
+    function renderScatterUg(data) {
+      var points = data.scatter_ug.points;
+      charts["scatter-ug-chart"].setOption({
+        color: PALETTE,
+        tooltip: {
+          formatter: function (p) {
+            return "高考 " + p.value[0] + "-" + (p.value[0] + 4) + " 分段<br>本科平均分：" +
+              fmtNum(p.value[1], 2) + "<br>学生人数：" + fmtInt(p.value[2]);
+          },
+        },
+        grid: baseGrid(),
+        xAxis: { type: "value", name: "高考成绩", scale: true },
+        yAxis: { type: "value", name: "本科平均成绩", scale: true },
+        series: [{
+          type: "scatter", data: points,
+          symbolSize: function (v) { return Math.min(28, 6 + Math.sqrt(v[2]) * 1.6); },
+          itemStyle: { color: "rgba(22, 127, 115, 0.65)" },
+        }],
+      });
+    }
+
+    // ---------------- 8. 高考 × GPA ----------------
+    function renderScatterGpa(data) {
+      var points = data.scatter_gpa.points;
+      var r = data.scatter_gpa.r;
+      var level = r === null ? "" :
+        Math.abs(r) < 0.3 ? "弱" : Math.abs(r) < 0.6 ? "中等" : "强";
+      document.getElementById("scatter-gpa-title").textContent =
+        r === null ? "高考成绩 × GPA" :
+        "高考成绩 × GPA：" + level + (r >= 0 ? "正相关" : "负相关") + "，r = " + r.toFixed(2);
+
+      // 加权线性回归趋势线（用普通折线 series 实现，避免 markLine 兼容性问题）
+      var lineData = [];
+      if (points.length > 1) {
+        var sw = 0, sx = 0, sy = 0, sxx = 0, sxy = 0;
+        points.forEach(function (p) {
+          sw += p[2]; sx += p[0] * p[2]; sy += p[1] * p[2];
+          sxx += p[0] * p[0] * p[2]; sxy += p[0] * p[1] * p[2];
+        });
+        var denom = sxx - sx * sx / sw;
+        if (denom) {
+          var slope = (sxy - sx * sy / sw) / denom;
+          var intercept = (sy - slope * sx) / sw;
+          var xs = [points[0][0], points[points.length - 1][0]];
+          lineData = xs.map(function (x) {
+            return [x, +(slope * x + intercept).toFixed(4)];
+          });
+        }
+      }
+      var series = [{
+        name: "分段平均 GPA", type: "scatter", data: points,
+        symbolSize: function (v) { return Math.min(28, 6 + Math.sqrt(v[2]) * 1.6); },
+        itemStyle: { color: "rgba(232, 89, 12, 0.6)" },
+      }];
+      if (lineData.length) {
+        series.push({
+          name: "趋势线", type: "line", data: lineData,
+          showSymbol: false, smooth: false, silent: true,
+          lineStyle: { color: "#167f73", width: 2 },
+          itemStyle: { color: "#167f73" },
+          tooltip: { show: false },
+        });
+      }
+      charts["scatter-gpa-chart"].setOption({
+        color: PALETTE,
+        tooltip: {
+          formatter: function (p) {
+            if (p.seriesName === "趋势线") return "";
+            return "高考 " + p.value[0] + "-" + (p.value[0] + 4) + " 分段<br>平均 GPA：" +
+              fmtNum(p.value[1], 3) + "<br>学生人数：" + fmtInt(p.value[2]);
+          },
+        },
+        legend: { top: 0, data: ["分段平均 GPA", "趋势线"] },
+        grid: baseGrid(),
+        xAxis: { type: "value", name: "高考成绩", scale: true },
+        yAxis: { type: "value", name: "GPA", scale: true },
+        series: series,
+      }, { notMerge: true });
+    }
+
+    // ---------------- 9. 相关性矩阵 ----------------
+    function renderCorr(data) {
+      var vars = data.corr.vars;
+      var matrix = data.corr.matrix;
+      var seriesData = [];
+      for (var i = 0; i < matrix.length; i++) {
+        for (var j = 0; j < matrix[i].length; j++) {
+          seriesData.push([j, i, matrix[i][j]]);
+        }
+      }
+      charts["corr-chart"].setOption({
+        tooltip: {
+          position: "top",
+          formatter: function (p) {
+            return vars[p.value[1]] + " × " + vars[p.value[0]] +
+              "：<strong>" + p.value[2].toFixed(2) + "</strong>";
+          },
+        },
+        grid: { left: 110, right: 90, top: 10, bottom: 90 },
+        xAxis: { type: "category", data: vars, splitArea: { show: true },
+                 axisLabel: { rotate: 40, fontSize: 10 } },
+        yAxis: { type: "category", data: vars, splitArea: { show: true },
+                 axisLabel: { fontSize: 10 } },
+        visualMap: {
+          min: -1, max: 1, calculable: true, orient: "vertical",
+          right: 0, top: "center",
+          inRange: { color: ["#2166ac", "#f7f7f7", "#b2182b"] },
+        },
+        series: [{
+          type: "heatmap", data: seriesData,
+          label: { show: true, fontSize: 9,
+                   formatter: function (p) { return p.value[2].toFixed(2); } },
+          emphasis: { itemStyle: { shadowBlur: 8, shadowColor: "rgba(0,0,0,0.3)" } },
+        }],
+      }, { notMerge: true });
+    }
+
+    // ---------------- 10. 稳定性散点 ----------------
+    function renderStability(data) {
+      var points = data.stability.points;
+      charts["stability-chart"].setOption({
+        color: PALETTE,
+        tooltip: {
+          formatter: function (p) {
+            return "本科平均分 ≈ " + p.value[0] + "<br>成绩标准差 σ ≈ " + p.value[1] +
+              "<br>学生人数：" + fmtInt(p.value[2]);
+          },
+        },
+        grid: baseGrid(),
+        xAxis: { type: "value", name: "本科平均分", scale: true },
+        yAxis: { type: "value", name: "成绩标准差 σ", scale: true },
+        series: [{
+          type: "scatter", data: points,
+          symbolSize: function (v) { return Math.min(30, 5 + Math.sqrt(v[2]) * 1.8); },
+          itemStyle: { color: "rgba(156, 54, 181, 0.55)" },
+        }],
+      });
+    }
+
+    // ---------------- 11. 桑基图 ----------------
+    function renderSankey(data) {
+      var rows = data.sankey.rows;
+      var nodes = {}, links = {};
+      function ensure(node) { nodes[node] = { name: node }; }
+      function addLink(source, target, value) {
+        var key = source + "→" + target;
+        links[key] = links[key] || { source: source, target: target, value: 0 };
+        links[key].value += value;
+      }
+      rows.forEach(function (row) {
+        ensure(row[0]); ensure(row[1]); ensure(row[2]); ensure(row[3]);
+        addLink(row[0], row[1], row[4]);
+        addLink(row[1], row[2], row[4]);
+        addLink(row[2], row[3], row[4]);
+      });
+      charts["sankey-chart"].setOption({
+        color: PALETTE,
+        tooltip: { trigger: "item",
+                   formatter: function (p) {
+                     if (p.dataType === "edge") {
+                       return p.data.source + " → " + p.data.target + "：" + fmtInt(p.data.value) + " 人";
+                     }
+                     return p.name + "：" + fmtInt(p.value) + " 人";
+                   } },
+        series: [{
+          type: "sankey", layoutIterations: 32,
+          emphasis: { focus: "adjacency" },
+          nodeGap: 10,
+          data: Object.keys(nodes).map(function (k) { return nodes[k]; }),
+          links: Object.keys(links).map(function (k) { return links[k]; }),
+          label: { fontSize: 10 },
+          lineStyle: { color: "gradient", curveness: 0.5, opacity: 0.35 },
+        }],
+      }, { notMerge: true });
+    }
+
+    // ---------------- 年份下拉 ----------------
+    function renderYearOptions(years) {
+      var select = document.getElementById("year-filter");
+      var current = state.nceeYear;
+      select.innerHTML = '<option value="">高考年份：全部</option>';
+      years.forEach(function (year) {
+        var option = document.createElement("option");
+        option.value = String(year);
+        option.textContent = year + " 年高考";
+        select.appendChild(option);
+      });
+      if (current && years.indexOf(Number(current)) !== -1) {
+        select.value = current;
+      } else if (current) {
+        state.nceeYear = "";
+      }
+    }
+
+    // ---------------- 主流程 ----------------
+    function renderAll(data) {
+      lastData = data;
+      renderKpi(data.kpi);
+      renderNceeDist(data);
+      renderNceeBands(data);
+      renderNceeTrend(data);
+      renderUgDist(data);
+      renderGradeTrend(data);
+      renderNatureBox(data);
+      renderScatterUg(data);
+      renderScatterGpa(data);
+      renderCorr(data);
+      renderStability(data);
+      renderSankey(data);
+      renderYearOptions(data.available_years || []);
+      emptyBox.hidden = !data.empty;
+      chartIds.forEach(function (id) { charts[id].resize(); });
+    }
+
+    function fetchAndRender() {
+      errorBox.hidden = true;
+      emptyBox.hidden = true;
+      loading.hidden = false;
+      var params = new URLSearchParams();
+      if (state.nature) params.set("nature", state.nature);
+      if (state.nceeYear) params.set("ncee_year", state.nceeYear);
+      var query = params.toString();
+      var url = query ? dataUrl + "?" + query : dataUrl;
+      fetch(url)
+        .then(function (response) {
+          return response.json().then(function (data) {
+            if (!response.ok) {
+              throw new Error(data.error || "请求失败（HTTP " + response.status + "）。");
+            }
+            return data;
+          });
+        })
+        .then(renderAll)
+        .catch(function (error) {
+          errorBox.textContent = error.message;
+          errorBox.hidden = false;
+        })
+        .finally(function () { loading.hidden = true; });
+    }
+
+    // 筛选交互
+    document.getElementById("nature-filter").addEventListener("click", function (event) {
+      var button = event.target.closest("button[data-nature]");
+      if (!button) return;
+      this.querySelectorAll("button").forEach(function (b) { b.classList.remove("active"); });
+      button.classList.add("active");
+      state.nature = button.dataset.nature;
+      fetchAndRender();
+    });
+    document.getElementById("year-filter").addEventListener("change", function () {
+      state.nceeYear = this.value;
+      fetchAndRender();
+    });
+    document.getElementById("ug-dist-toggle").addEventListener("click", function (event) {
+      var button = event.target.closest("button[data-metric]");
+      if (!button || lastData === null) return;
+      this.querySelectorAll("button").forEach(function (b) { b.classList.remove("active"); });
+      button.classList.add("active");
+      state.ugMetric = button.dataset.metric;
+      renderUgDist(lastData);
+    });
+    document.getElementById("nature-box-toggle").addEventListener("click", function (event) {
+      var button = event.target.closest("button[data-box]");
+      if (!button || lastData === null) return;
+      this.querySelectorAll("button").forEach(function (b) { b.classList.remove("active"); });
+      button.classList.add("active");
+      state.boxMetric = button.dataset.box;
+      renderNatureBox(lastData);
+    });
+
+    fetchAndRender();
+  })();
+  </script>
+{% endblock %}

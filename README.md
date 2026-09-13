@@ -7,7 +7,13 @@
 - 学生：手工添加、小数据量批量添加、大数据量批量添加、手工维护学生信息
 - 大学：手工添加大学、手工添加专业组、自动添加大学和专业组
 - 入学：手动入学、自动入学
-- 统计分析：历年学生数量、各大学学生数量
+- 模拟：高考、录取、日常考试、毕业
+- 统计分析：成绩分析看板、历年学生数量、各大学学生数量
+
+“成绩分析看板”直接只读 web_db 业务库（`MYSQL_WEB_*` 配置），在 MySQL 内完成
+预聚合（分箱直方图、分位数、相关系数、桑基流量）后由同源 JSON 端点
+`/analytics/scores-dashboard/api/data` 提供给 ECharts 渲染；支持按高校性质
+（985/211/一本/其他）与高考年份全局筛选。
 
 所有页面继承 `base.html`，并通过 Bootstrap 5.3.8 下拉菜单统一导航。
 
@@ -33,6 +39,26 @@
 - 页面请求先到达 Flask 同源 JSON 代理端点
   （`/students/maintain/api/students*`），由 `alt_web01/api_client.py`
   （httpx）转发到 API 服务器，避免跨域问题
+
+### 模拟（高考 / 录取 / 日常考试 / 毕业）
+
+- 一级菜单“模拟”下的四个二级菜单页面：高考（`/simulations/ncee`）、录取
+  （`/simulations/admission`）、日常考试（`/simulations/exam`）、毕业
+  （`/simulations/graduate`）
+- 每个页面均可指定年份（2018-2040），先查询该年符合条件的人数：
+  - 高考：适龄考生（未高考，考试当年 17-19 岁）
+  - 录取：待录取考生（已高考未入学，且该年有高考成绩）
+  - 日常考试：在读考生（学年 在 `[year-3, year]` 内入学）
+  - 毕业：可毕业考生（在读，且录取学年=毕业年份-4）
+- 点击“模拟…”按钮调用 Celery 平台对应任务（`simu_ncee` / `simu_admission` /
+  `simu_exam` / `simu_graduate`），页面每 3 秒轮询进度直至完成并展示结果
+- 数据全部通过 **Celery 任务平台 API 服务器**（alt_celery3 的
+  FastAPI 服务）读写，服务器地址在 `.env` 中配置：
+  - `API_SERVER_TASKS` — 任务目录地址（如 `http://192.168.220.136:8012/api/tasks`），
+    同时用于推导服务器基地址（派发、结果轮询、人数统计）
+- 页面请求先到达 Flask 同源 JSON 代理端点
+  （`/simulations/<slug>/api/*`），由 `alt_web01/tasks_api_client.py`
+  （httpx）转发到任务平台 API 服务器
 
 ### 手工添加大学
 
@@ -63,6 +89,7 @@
 ├── src/alt_web01/
 │   ├── __init__.py          # Flask 应用工厂
 │   ├── api_client.py        # 学生 API 服务器（poc4）HTTP 客户端
+│   ├── tasks_api_client.py  # 任务平台 API 服务器（alt_celery3）HTTP 客户端
 │   ├── views/               # 按页面拆分的路由模块
 │   │   ├── __init__.py      # 共享 Blueprint 与模块注册
 │   │   ├── common.py        # 通用页面渲染工具
@@ -72,7 +99,8 @@
 │       ├── base.html        # 导航与公共布局
 │       ├── page.html        # 页面名称占位模板
 │       ├── student_add.html # 手工添加学生页面
-│       └── student_maintain.html # 手工维护学生信息页面
+│       ├── student_maintain.html # 手工维护学生信息页面
+│       └── simulation.html # 模拟页面（高考/录取/日常考试/毕业 共用）
 ├── tests/test_students.py   # 学生录入流程测试
 ├── wsgi.py                  # 容器 WSGI 入口
 ├── pyproject.toml           # PEP 517 / PEP 621 项目配置
@@ -116,6 +144,9 @@ MYSQL_PASSWORD=使用 /opt/dockers/mysql/.env 中现有的 MYSQL_PASSWORD
 API_SERVER_DOCS=http://192.168.220.134:8001/docs
 API_SERVER_REDOC=http://192.168.220.134:8001/redoc
 API_SERVER_JSON=http://192.168.220.134:8001/openapi.json
+
+# Celery 任务平台 API 服务器（alt_celery3 的 FastAPI 任务服务）
+API_SERVER_TASKS=http://192.168.220.136:8012/api/tasks
 ```
 
 网站容器会加入 MySQL 使用的外部 `app-network`，通过容器名 `mysql-server:3306`
