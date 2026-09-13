@@ -600,8 +600,84 @@ GROUP BY seg1, seg2, seg3, seg4
 
 
 # ---------------------------------------------------------------------------
-# Public entry point
+# University student counts (各大学学生数量统计页)
 # ---------------------------------------------------------------------------
+
+
+def collect_university_student_counts(config: Mapping[str, object]) -> dict[str, Any]:
+    """Count enrolled students per university from ``web_db``.
+
+    Aggregates ``enrollments`` joined with ``universities``: for every
+    university the number of distinct enrolled students (``学生人数``) and the
+    number of enrollment records (``录取人次``, larger when a student appears
+    in several academic years).  Results are sorted by student count.
+
+    Args:
+        config: Flask configuration holding the ``MYSQL_WEB_*`` settings.
+
+    Returns:
+        JSON-ready dictionary with ``items`` (one per university),
+        per-nature ``summary``, and an ``empty`` flag.  Degrades to an empty
+        payload when the tables do not exist yet or the DB is unreachable.
+    """
+    settings = _settings(config)  # raises WebDBUnavailableError when unconfigured
+    connection: pymysql.connections.Connection | None = None
+    try:
+        connection = pymysql.connect(
+            charset="utf8mb4",
+            cursorclass=DictCursor,
+            connect_timeout=5,
+            read_timeout=60,
+            **settings,  # type: ignore[arg-type]
+        )
+        with connection.cursor() as cursor:
+            rows = _rows(
+                cursor,
+                """
+SELECT u.name                        AS name,
+       u.nature                      AS nature,
+       COUNT(DISTINCT e.student_id)  AS students,
+       COUNT(*)                      AS enrollments
+FROM enrollments e
+JOIN universities u ON u.id = e.university_id
+GROUP BY u.id, u.name, u.nature
+ORDER BY students DESC, enrollments DESC, u.name ASC
+""",
+                [],
+            )
+    except pymysql.err.OperationalError as error:
+        raise WebDBUnavailableError(f"web_db 暂时无法连接：{error}") from error
+    finally:
+        if connection is not None:
+            connection.close()
+
+    items = [
+        {
+            "name": str(row["name"]),
+            "nature": str(row["nature"] or "未标注"),
+            "students": _i(row["students"]),
+            "enrollments": _i(row["enrollments"]),
+        }
+        for row in rows
+    ]
+
+    summary: dict[str, dict[str, int]] = {}
+    for item in items:
+        agg = summary.setdefault(
+            item["nature"], {"universities": 0, "students": 0, "enrollments": 0}
+        )
+        agg["universities"] += 1
+        agg["students"] += item["students"]
+        agg["enrollments"] += item["enrollments"]
+    natures = [n for n in NATURE_ORDER if n in summary]
+    natures += sorted(k for k in summary if k not in NATURE_ORDER)
+
+    return {
+        "ok": True,
+        "items": items,
+        "summary": [{"nature": n, **summary[n]} for n in natures],
+        "empty": not items,
+    }
 
 
 def collect_score_stats(

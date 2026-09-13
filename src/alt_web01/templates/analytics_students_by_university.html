@@ -1,0 +1,260 @@
+{% extends "base.html" %}
+
+{% block title %}各大学学生数量统计 · alt_web01{% endblock %}
+
+{% block vendor_styles %}
+  <style>
+    .kpi-card {
+      background: rgb(255 255 255 / 88%);
+      border: 1px solid rgb(23 59 79 / 9%);
+      border-radius: 1.2rem;
+      box-shadow: 0 .6rem 1.8rem rgb(40 105 117 / 7%);
+      padding: 1rem 1.2rem;
+      height: 100%;
+    }
+    .kpi-label { font-size: .8rem; color: var(--campus-muted, #5b6b73); margin: 0; }
+    .kpi-value { font-size: 1.55rem; font-weight: 700; line-height: 1.25; margin: .2rem 0 0; }
+    .chart-card {
+      background: rgb(255 255 255 / 88%);
+      border: 1px solid rgb(23 59 79 / 9%);
+      border-radius: 1.6rem;
+      box-shadow: 0 1.25rem 3.5rem rgb(40 105 117 / 9%);
+      padding: 1.5rem;
+      height: 100%;
+    }
+    .chart-title { font-size: 1rem; font-weight: 600; margin: 0 0 .2rem; }
+    .chart-subtitle { font-size: .78rem; color: var(--campus-muted, #5b6b73); margin: 0 0 .6rem; }
+    .chart-body { width: 100%; height: 26rem; }
+    .chart-caption { margin: .6rem 0 0; color: var(--campus-muted); font-size: .76rem; }
+    .metric-toggle .btn.active { background: #167f73; border-color: #167f73; color: #fff; }
+  </style>
+{% endblock %}
+
+{% block content %}
+<section aria-labelledby="page-title">
+  <header class="student-heading">
+    <div>
+      <p class="page-kicker">统计分析 · 学生数量</p>
+      <h1 id="page-title">各大学学生数量统计</h1>
+      <p class="student-intro">
+        按入学高校统计学生人数与录取人次（数据来自任务平台业务库的入学记录）。
+      </p>
+    </div>
+    <div class="range-note" aria-label="统计口径">
+      <span>统计口径</span>
+      <strong>入学记录去重学生</strong>
+    </div>
+  </header>
+
+  <div class="chart-card mb-3">
+    <div class="d-flex flex-wrap gap-3 align-items-center">
+      <div class="metric-toggle btn-group btn-group-sm" role="group" aria-label="高校性质筛选" id="nature-filter">
+        <button type="button" class="btn btn-outline-secondary active" data-nature="">全部高校</button>
+        <button type="button" class="btn btn-outline-secondary" data-nature="985">985</button>
+        <button type="button" class="btn btn-outline-secondary" data-nature="211">211</button>
+        <button type="button" class="btn btn-outline-secondary" data-nature="一本">一本</button>
+        <button type="button" class="btn btn-outline-secondary" data-nature="其他">其他</button>
+      </div>
+      <span id="loading-indicator" class="spinner-border spinner-border-sm text-secondary" role="status" aria-hidden="true"></span>
+    </div>
+    <div id="data-error" class="notice notice-error mt-3" role="alert" hidden></div>
+    <div id="empty-notice" class="notice mt-3" role="status" hidden>
+      暂无入学数据：请先运行“模拟 → 录取”或“一条龙毕业”任务生成入学记录。
+    </div>
+  </div>
+
+  <div class="row g-3 mb-3">
+    <div class="col-6 col-md-4"><div class="kpi-card"><p class="kpi-label">有入学记录的高校</p><p class="kpi-value" id="kpi-universities">–</p></div></div>
+    <div class="col-6 col-md-4"><div class="kpi-card"><p class="kpi-label">入学学生总数</p><p class="kpi-value" id="kpi-students">–</p></div></div>
+    <div class="col-6 col-md-4"><div class="kpi-card"><p class="kpi-label">录取人次总数</p><p class="kpi-value" id="kpi-enrollments">–</p></div></div>
+  </div>
+
+  <div class="row g-3 mb-3">
+    <div class="col-lg-7">
+      <div class="chart-card">
+        <p class="chart-title">各大学入学学生人数</p>
+        <div class="metric-toggle btn-group btn-group-sm mb-2" role="group" aria-label="显示数量" id="top-filter">
+          <button type="button" class="btn btn-outline-secondary active" data-top="20">Top 20</button>
+          <button type="button" class="btn btn-outline-secondary" data-top="0">全部</button>
+        </div>
+        <div id="university-chart"></div>
+        <p class="chart-caption">“学生人数”按学生在该校的入学记录去重；“录取人次”含同学年重复记录。</p>
+      </div>
+    </div>
+    <div class="col-lg-5">
+      <div class="chart-card">
+        <p class="chart-title">按高校性质汇总</p>
+        <div id="nature-chart" class="chart-body"></div>
+      </div>
+    </div>
+  </div>
+</section>
+{% endblock %}
+
+{% block scripts %}
+  <script src="https://cdn.jsdelivr.net/npm/echarts@5.5.1/dist/echarts.min.js"></script>
+  <script>
+  (function () {
+    "use strict";
+
+    var dataUrl = "{{ data_url }}";
+    var state = { nature: "", top: 20 };
+    var lastData = null;
+    var loading = document.getElementById("loading-indicator");
+    var errorBox = document.getElementById("data-error");
+    var emptyBox = document.getElementById("empty-notice");
+    var uniChart = echarts.init(document.getElementById("university-chart"));
+    var natureChart = echarts.init(document.getElementById("nature-chart"));
+    window.addEventListener("resize", function () { uniChart.resize(); natureChart.resize(); });
+
+    function fmtInt(value) {
+      return value === null || value === undefined ? "–" : Number(value).toLocaleString("zh-CN");
+    }
+
+    // 按性质筛选后的明细数据（含“其余 N 所”聚合项）
+    function filteredItems() {
+      var items = (lastData.items || []).filter(function (it) {
+        return !state.nature || it.nature === state.nature;
+      });
+      if (state.top > 0 && items.length > state.top) {
+        var rest = items.slice(state.top);
+        var restStudents = 0, restEnrollments = 0;
+        rest.forEach(function (it) {
+          restStudents += it.students; restEnrollments += it.enrollments;
+        });
+        return items.slice(0, state.top).concat([{
+          name: "其余 " + rest.length + " 所（合计）",
+          nature: "",
+          students: restStudents,
+          enrollments: restEnrollments,
+          isRest: true,
+        }]);
+      }
+      return items;
+    }
+
+    function renderKpi(items) {
+      var universities = items.filter(function (it) { return !it.isRest; }).length;
+      var students = 0, enrollments = 0;
+      items.forEach(function (it) { students += it.students; enrollments += it.enrollments; });
+      document.getElementById("kpi-universities").textContent = fmtInt(universities);
+      document.getElementById("kpi-students").textContent = fmtInt(students);
+      document.getElementById("kpi-enrollments").textContent = fmtInt(enrollments);
+    }
+
+    function renderUniversityChart() {
+      var items = filteredItems();
+      renderKpi(items);
+      var height = Math.max(320, items.length * 34 + 90);
+      document.getElementById("university-chart").style.height = height + "px";
+      uniChart.resize();
+      uniChart.setOption({
+        color: ["#167f73", "#2b8aef"],
+        tooltip: {
+          trigger: "axis",
+          axisPointer: { type: "shadow" },
+          formatter: function (params) {
+            var html = params[0].name;
+            params.forEach(function (p) {
+              html += "<br>" + p.marker + p.seriesName + "：" + fmtInt(p.value);
+            });
+            return html;
+          },
+        },
+        legend: { top: 0 },
+        grid: { left: 150, right: 50, top: 36, bottom: 30 },
+        xAxis: { type: "value", name: "数量",
+                 axisLabel: { formatter: function (v) { return fmtInt(v); } } },
+        yAxis: {
+          type: "category",
+          inverse: true,
+          data: items.map(function (it) { return it.name; }),
+          axisLabel: {
+            width: 140, overflow: "truncate",
+            formatter: function (value, index) {
+              var it = items[index];
+              return it.nature ? value + "（" + it.nature + "）" : value;
+            },
+          },
+        },
+        series: [
+          { name: "学生人数", type: "bar", data: items.map(function (it) { return it.students; }),
+            barMaxWidth: 14, itemStyle: { color: "#167f73", borderRadius: [0, 5, 5, 0] } },
+          { name: "录取人次", type: "bar", data: items.map(function (it) { return it.enrollments; }),
+            barMaxWidth: 14, itemStyle: { color: "rgba(43, 138, 239, 0.55)", borderRadius: [0, 5, 5, 0] } },
+        ],
+      }, { notMerge: true });
+    }
+
+    function renderNatureChart() {
+      var summary = (lastData.summary || []).filter(function (s) {
+        return !state.nature || s.nature === state.nature;
+      });
+      natureChart.setOption({
+        color: ["#167f73", "#2b8aef"],
+        tooltip: { trigger: "axis", axisPointer: { type: "shadow" } },
+        legend: { top: 0 },
+        grid: { left: 70, right: 30, top: 40, bottom: 40 },
+        xAxis: { type: "category", data: summary.map(function (s) { return s.nature; }), name: "高校性质" },
+        yAxis: { type: "value", name: "数量",
+                 axisLabel: { formatter: function (v) { return fmtInt(v); } } },
+        series: [
+          { name: "学生人数", type: "bar", data: summary.map(function (s) { return s.students; }),
+            barMaxWidth: 40, itemStyle: { color: "#167f73", borderRadius: [6, 6, 0, 0] },
+            label: { show: true, position: "top", formatter: function (p) { return fmtInt(p.value); } } },
+          { name: "录取人次", type: "bar", data: summary.map(function (s) { return s.enrollments; }),
+            barMaxWidth: 40, itemStyle: { color: "rgba(43, 138, 239, 0.55)", borderRadius: [6, 6, 0, 0] } },
+        ],
+      }, { notMerge: true });
+    }
+
+    function renderAll(data) {
+      lastData = data;
+      renderUniversityChart();
+      renderNatureChart();
+      emptyBox.hidden = !data.empty;
+    }
+
+    function fetchAndRender() {
+      errorBox.hidden = true;
+      emptyBox.hidden = true;
+      loading.hidden = false;
+      fetch(dataUrl)
+        .then(function (response) {
+          return response.json().then(function (data) {
+            if (!response.ok) {
+              throw new Error(data.error || "请求失败（HTTP " + response.status + "）。");
+            }
+            return data;
+          });
+        })
+        .then(renderAll)
+        .catch(function (error) {
+          errorBox.textContent = error.message;
+          errorBox.hidden = false;
+        })
+        .finally(function () { loading.hidden = true; });
+    }
+
+    document.getElementById("nature-filter").addEventListener("click", function (event) {
+      var button = event.target.closest("button[data-nature]");
+      if (!button || lastData === null) return;
+      this.querySelectorAll("button").forEach(function (b) { b.classList.remove("active"); });
+      button.classList.add("active");
+      state.nature = button.dataset.nature;
+      renderUniversityChart();
+      renderNatureChart();
+    });
+    document.getElementById("top-filter").addEventListener("click", function (event) {
+      var button = event.target.closest("button[data-top]");
+      if (!button || lastData === null) return;
+      this.querySelectorAll("button").forEach(function (b) { b.classList.remove("active"); });
+      button.classList.add("active");
+      state.top = Number(button.dataset.top);
+      renderUniversityChart();
+    });
+
+    fetchAndRender();
+  })();
+  </script>
+{% endblock %}
